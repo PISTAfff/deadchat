@@ -523,3 +523,7 @@ button:active:not(:disabled) { transform: scale(.93); }
   .rec-pause { order: 3; flex: none; width: auto; padding: 0 16px; height: 42px; }
   .rec-send { order: 4; width: 46px; height: 46px; }
 }
+
+/* the dot glides with playback */
+.wave .dot { will-change: left; }
+.wave i { transition: background-color .08s linear; }

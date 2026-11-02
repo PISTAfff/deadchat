@@ -364,8 +364,8 @@ function updateVoiceUI() {
   const v = voiceNode(playingIdx); if (!v) return;
   v.classList.add('playing');
   v.querySelector('.play').innerHTML = player.paused ? PLAY : PAUSE;
-  const dur = player.duration;
-  if (isFinite(dur) && dur > 0) setWave(v, player.currentTime / dur);
+  const dur = playingDuration();
+  if (dur > 0) setWave(v, Math.min(1, player.currentTime / dur));
   v.querySelector('.v-time').textContent = fmtDur(player.currentTime);
 }
 
@@ -378,27 +378,62 @@ function resetVoiceUI(i) {
   v.querySelector('.v-time').textContent = d ? fmtDur(d) : '0:00';
 }
 
-function playVoice(i, seekFrac) {
+// the phone build plays voice notes from an in-memory copy (steadier than streaming through the
+// service worker on Android); the desktop plays the file directly
+let playerUrl = null;
+async function voiceSrc(m) {
+  if (!document.documentElement.classList.contains('web') || !api.readMedia) return mediaUrl(m.a.f);
+  const bytes = await api.readMedia(S.chatId, m.a.f);
+  if (playerUrl) URL.revokeObjectURL(playerUrl);
+  const ext = m.a.f.split('.').pop().toLowerCase();
+  playerUrl = URL.createObjectURL(new Blob([bytes], { type: ext === 'webm' ? 'audio/webm' : ext === 'm4a' ? 'audio/mp4' : ext === 'mp3' ? 'audio/mpeg' : 'audio/ogg' }));
+  return playerUrl;
+}
+
+// a known length for the playing note even when the file doesn't say (recorded .webm)
+function playingDuration() {
+  if (isFinite(player.duration) && player.duration > 0) return player.duration;
+  const m = playingIdx != null && S.chat.messages[playingIdx];
+  return durations.get(playingIdx) || (m && m.a && durByFile.get(m.a.f)) || 0;
+}
+
+async function playVoice(i, seekFrac) {
   const m = S.chat.messages[i];
   if (playingIdx !== i) {
     if (playingIdx != null) resetVoiceUI(playingIdx);
     playingIdx = i;
-    player.src = mediaUrl(m.a.f);
+    try { player.src = await voiceSrc(m); } catch (err) { toast('Could not play this voice note: ' + err.message); return; }
+    if (playingIdx !== i) return; // another note was tapped meanwhile
     player.playbackRate = speed;
   }
   if (seekFrac != null) {
-    const go = () => { if (isFinite(player.duration)) player.currentTime = seekFrac * player.duration; };
+    const go = () => { const d = playingDuration(); if (d) player.currentTime = seekFrac * d; };
     if (player.readyState >= 1) go(); else player.addEventListener('loadedmetadata', go, { once: true });
   }
-  player.play().catch(err => toast('Could not play this voice note: ' + err.message));
+  player.play().catch(err => { if (err.name !== 'AbortError') toast('Could not play this voice note: ' + err.message); });
+  tickVoice();
 }
+
+// move the dot and bars every frame while playing, so it glides like WhatsApp instead of jumping
+let voiceFrame = 0;
+function tickVoice() {
+  cancelAnimationFrame(voiceFrame);
+  const step = () => {
+    if (playingIdx == null || player.paused) return;
+    const v = voiceNode(playingIdx), d = playingDuration();
+    if (v && d) setWave(v, Math.min(1, player.currentTime / d));
+    voiceFrame = requestAnimationFrame(step);
+  };
+  voiceFrame = requestAnimationFrame(step);
+}
+player.addEventListener('play', tickVoice);
 
 function stopAudio() { player.pause(); if (playingIdx != null) resetVoiceUI(playingIdx); playingIdx = null; }
 
 player.addEventListener('timeupdate', updateVoiceUI);
 player.addEventListener('play', updateVoiceUI);
 player.addEventListener('pause', updateVoiceUI);
-player.addEventListener('loadedmetadata', () => { if (playingIdx != null) durations.set(playingIdx, player.duration); updateVoiceUI(); });
+player.addEventListener('loadedmetadata', () => { if (playingIdx != null && isFinite(player.duration) && player.duration > 0) durations.set(playingIdx, player.duration); updateVoiceUI(); });
 player.addEventListener('ended', () => {
   const done = playingIdx;
   resetVoiceUI(done);
@@ -976,6 +1011,8 @@ $('#messages').addEventListener('contextmenu', e => {
   menu.onclick = async ev => {
     if (ev.target.closest('[data-copy]')) api.copyText(S.chat.messages[i].x || '');
     if (ev.target.closest('[data-del]')) {
+      if (playingIdx === i) stopAudio();
+      else if (playingIdx != null && playingIdx > i) playingIdx--;
       await api.unwriteMessage(S.chatId, row.dataset.uid);
       S.chat.messages.splice(i, 1);
       S.hi = Math.min(S.hi, S.chat.messages.length);
