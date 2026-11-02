@@ -15,7 +15,16 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 const d = t => new Date(t);
 const fmtTime = t => { const x = d(t); let h = x.getUTCHours(); const ap = h < 12 ? 'am' : 'pm'; h = h % 12 || 12; return `${h}:${String(x.getUTCMinutes()).padStart(2, '0')} ${ap}`; };
 const fmtDate = t => { const x = d(t); return `${x.getUTCDate()} ${MONTHS[x.getUTCMonth()]} ${x.getUTCFullYear()}`; };
-const fmtDay = t => `${DAYS[d(t).getUTCDay()]}, ${fmtDate(t)}`;
+const FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const fmtDay = t => {
+  const now = new Date(), today = Math.floor(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86400000);
+  const diff = today - Math.floor(t / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  if (diff > 1 && diff < 7) return DAYS[d(t).getUTCDay()];
+  const x = d(t);
+  return `${x.getUTCDate()} ${FULL_MONTHS[x.getUTCMonth()]} ${x.getUTCFullYear()}`;
+};
 const dayKey = t => Math.floor(t / 86400000);
 const fmtDur = s => (!isFinite(s) || s < 0) ? '0:00' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 

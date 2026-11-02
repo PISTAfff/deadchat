@@ -412,3 +412,20 @@ button:active:not(:disabled) { transform: scale(.93); }
 .info-grid img:active, .gthumb:active, .media-img:active { transform: scale(.97); filter: brightness(.9); }
 .primary:hover { filter: brightness(1.08); }
 .send:active:not(:disabled) { transform: scale(.88); }
+
+/* phones: sizes closer to WhatsApp for Android */
+@media (max-width: 768px) {
+  .chat-head { background: #1f2c34; height: calc(64px + env(safe-area-inset-top)); }
+  .chat-head .avatar, #chat-avatar { width: 44px; height: 44px; }
+  .chat-title { font-size: 18px; }
+  .chat-sub { font-size: 13px; }
+  .bubble { font-size: 16px; line-height: 21px; border-radius: 10px; padding: 6px 8px 7px 10px; max-width: 82%; }
+  .msg.first.in .bubble { border-top-left-radius: 0; }
+  .msg.first.out .bubble { border-top-right-radius: 0; }
+  .meta { font-size: 11.5px; }
+  .day span { font-size: 13px; padding: 6px 14px; border-radius: 9px; background: #1f2c34; color: #a9b6bd; }
+  .sys span { font-size: 13px; }
+  .row-title { font-size: 17px; }
+  .row-sub { font-size: 14.5px; }
+  .side-head .wordmark { font-size: 23px; }
+}

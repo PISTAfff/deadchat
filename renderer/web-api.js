@@ -8,6 +8,8 @@
   const native = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform());
   const plugin = name => native && Capacitor.Plugins && Capacitor.Plugins[name];
   document.documentElement.classList.add('web');
+  // WhatsApp for Android says just "Message"
+  addEventListener('DOMContentLoaded', () => { const c = document.getElementById('compose'); if (c && matchMedia('(max-width: 768px)').matches) c.placeholder = 'Message'; });
 
   // ---------- IndexedDB ----------
   let dbp;
