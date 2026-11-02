@@ -93,6 +93,7 @@ async function openChat(id) {
   }
   showView('chat');
   renderSide();
+  fitCompose();
   // always open at the very end, like WhatsApp
   S.hi = msgs.length; S.lo = Math.max(0, S.hi - CHUNK); renderWindow(); stickToBottom();
 }
@@ -150,9 +151,10 @@ function renderMessage(m, i, prev) {
     else if (a.k === 'image') body = `<img class="media-img" loading="lazy" decoding="async" src="${mediaUrl(a.f)}" alt="">`;
     else if (a.k === 'sticker') body = `<img class="sticker" loading="lazy" decoding="async" src="${mediaUrl(a.f)}" alt="sticker">`;
     else if (a.k === 'video') body = `<video class="media-video" controls preload="metadata" src="${mediaUrl(a.f)}"></video>`;
-    else if (a.k === 'audio') body = voiceHtml(i);
+    else if (a.k === 'audio') body = voiceHtml(i, meta);
     else body = `<div class="doc" data-open="${esc(a.f)}">📄 <span class="doc-name">${esc(a.f)}</span></div>`;
-    b.innerHTML = body + (m.x ? `<div class="text caption" dir="auto">${linkify(m.x)}</div>` : '') + meta;
+    const voiceOwnsMeta = a.k === 'audio' && !a.missing && !m.x; // voice notes show the time in their own footer, like WhatsApp
+    b.innerHTML = body + (m.x ? `<div class="text caption" dir="auto">${linkify(m.x)}</div>` : '') + (voiceOwnsMeta ? '' : meta);
   } else {
     b.innerHTML = `<span class="text" dir="auto">${linkify(m.x)}</span>${meta}`;
     if (isRtl(m.x)) b.classList.add('rtl');
@@ -330,7 +332,7 @@ function waveBars(name) {
   return out;
 }
 
-function voiceHtml(i) {
+function voiceHtml(i, meta = '') {
   const m = S.chat.messages[i], dur = durations.get(i), playing = playingIdx === i;
   const name = (S.chat.participants[m.s]?.name || '?').normalize('NFKC').replace(/[^\p{L}\p{N}]/gu, '');
   const bars = waveBars(m.a.f).map(v => `<i class="h${Math.round(v / 10)}"></i>`).join('');
@@ -338,7 +340,7 @@ function voiceHtml(i) {
     <button class="play" title="Play">${playing && !player.paused ? PAUSE : PLAY}</button>
     <div class="v-main">
       <div class="wave" title="Seek">${bars}<span class="dot"></span></div>
-      <div class="v-time">${playing ? fmtDur(player.currentTime) : dur ? fmtDur(dur) : '0:00'}</div>
+      <div class="v-foot"><span class="v-time">${playing ? fmtDur(player.currentTime) : dur ? fmtDur(dur) : '0:00'}</span>${S.chat.messages[i].x ? '' : meta}</div>
     </div>
     <div class="v-side">
       <div class="v-avatar">${m.s !== S.chat.me && S.chat.avatarUrl ? `<img src="${esc(S.chat.avatarUrl)}" alt="">` : esc(name.charAt(0).toUpperCase() || '?')}<span class="v-mic">${MIC}</span></div>
@@ -779,16 +781,33 @@ const fitCompose = () => {
   compose.style.height = 'auto';
   compose.style.height = Math.min(compose.scrollHeight, 140) + 'px';
   const has = !!compose.value.trim();
-  $('#send').disabled = !has;
+  $('#send').disabled = false;
+  $('#send').title = has ? 'Send (Enter) · it stays here, never delivered' : 'Record a voice note';
   document.querySelector('.composer').classList.toggle('typing', has);
 };
 
 // emoji picker, like WhatsApp's
 const EMOJI = '😀 😁 😂 🤣 😊 😍 🥰 😘 😅 😭 😢 🥺 😩 😤 😡 🤬 😳 😱 🙄 😏 😌 😴 🤔 🤭 🫠 🤍 🖤 ❤️ 💔 ❤️‍🩹 💕 💗 🌹 🌙 ⭐ ✨ 🔥 💯 👍 👎 👏 🙏 🤝 👀 🫶 🤲 💪 ☠️ 💀 😶 😐 😑 🙃 😇 🤗 🤡 👻 🎉 🎶 🎧 📚 ☕ 🍕 🌊 🏖️ 🚗 ✈️ 📸 💬 ✔️'.split(' ');
-$('#emoji-panel').innerHTML = EMOJI.map(e => `<button data-e="${e}">${e}</button>`).join('');
+const emojiHtml = EMOJI.map(e => `<button data-e="${e}">${e}</button>`).join('');
+$('#ep-body').innerHTML = emojiHtml;
+$('#ep-body').className = 'ep-body emoji';
+document.querySelector('.ep-tabs').addEventListener('click', async e => {
+  e.stopPropagation();
+  const t = e.target.closest('[data-tab]'); if (!t) return;
+  document.querySelectorAll('.ep-tabs button').forEach(b => b.classList.toggle('on', b === t));
+  const body = $('#ep-body');
+  if (t.dataset.tab === 'emoji') { body.className = 'ep-body emoji'; body.innerHTML = emojiHtml; return; }
+  body.className = 'ep-body stickers'; body.innerHTML = '<div class="ep-empty">Loading stickers…</div>';
+  const list = await api.listStickers();
+  body.innerHTML = list.length
+    ? list.map(s => `<button data-sticker="${esc(s.f)}" data-from="${esc(s.chatId)}"><img src="${esc(s.url)}" loading="lazy" alt=""></button>`).join('')
+    : '<div class="ep-empty">No stickers in your imported chats yet.</div>';
+});
 $('#emoji-btn').onclick = e => { e.stopPropagation(); $('#emoji-panel').hidden = !$('#emoji-panel').hidden; if (!$('#emoji-panel').hidden) compose.focus(); };
 $('#emoji-panel').addEventListener('click', e => {
   e.stopPropagation();
+  const st = e.target.closest('[data-sticker]');
+  if (st) { $('#emoji-panel').hidden = true; sendWith(() => api.sendSticker(S.chatId, st.dataset.from, st.dataset.sticker)); return; }
   const b = e.target.closest('[data-e]'); if (!b) return;
   const s = compose.selectionStart ?? compose.value.length, en = compose.selectionEnd ?? s;
   compose.value = compose.value.slice(0, s) + b.dataset.e + compose.value.slice(en);
@@ -797,8 +816,55 @@ $('#emoji-panel').addEventListener('click', e => {
 });
 document.addEventListener('click', e => { if (!e.target.closest('#emoji-panel, #emoji-btn')) $('#emoji-panel').hidden = true; });
 compose.addEventListener('input', fitCompose);
+fitCompose(); // start with the mic showing
 compose.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendLocal(); } });
-$('#send').onclick = sendLocal;
+$('#send').onclick = () => { if (compose.value.trim()) sendLocal(); else if (rec) stopRecording(true); else startRecording(); };
+$('#attach-btn').onclick = () => sendWith(() => api.attachFiles(S.chatId));
+
+// adds undelivered messages to the open chat and shows them at the bottom
+async function sendWith(fn) {
+  if (!S.chat) return;
+  try {
+    const r = await fn();
+    const msgs = Array.isArray(r) ? r : r ? [r] : [];
+    if (!msgs.length) return;
+    S.chat.messages.push(...msgs);
+    S.hi = S.chat.messages.length; S.lo = Math.max(0, S.hi - CHUNK);
+    renderWindow(); stickToBottom(); refreshChats();
+  } catch (err) { toast(err.message); }
+}
+
+// ---------- voice notes you record (they stay here, never delivered) ----------
+let rec = null;
+async function startRecording() {
+  if (!S.chat) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+    const mr = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+    const chunks = [];
+    mr.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+    rec = { mr, stream, chunks, start: Date.now(), keep: false };
+    rec.timer = setInterval(() => { $('#rec-time').textContent = fmtDur((Date.now() - rec.start) / 1000); }, 250);
+    mr.onstop = async () => {
+      const r = rec; rec = null;
+      clearInterval(r.timer);
+      r.stream.getTracks().forEach(t => t.stop());
+      document.querySelector('.composer').classList.remove('recording');
+      $('#rec-bar').hidden = true; $('#rec-time').textContent = '0:00';
+      if (!r.keep || !r.chunks.length) return;
+      const blob = new Blob(r.chunks, { type: r.chunks[0].type || 'audio/webm' });
+      // desktop sends bytes over IPC; the phone build stores the Blob directly
+      const payload = window.DeadChat && !window.require ? (document.documentElement.classList.contains('web') ? blob : new Uint8Array(await blob.arrayBuffer())) : new Uint8Array(await blob.arrayBuffer());
+      sendWith(() => api.sendVoice(S.chatId, payload));
+    };
+    mr.start(250);
+    document.querySelector('.composer').classList.add('recording');
+    $('#rec-bar').hidden = false;
+  } catch (err) { toast('Microphone not available: ' + err.message); }
+}
+function stopRecording(keep) { if (!rec) return; rec.keep = keep; rec.mr.stop(); }
+$('#rec-cancel').onclick = () => stopRecording(false);
 
 async function sendLocal() {
   const text = compose.value.replace(/\s+$/, '');

@@ -209,9 +209,52 @@ class Store {
   deleteLocalMessage(id, msgId) {
     const chat = this.readChat(id);
     const before = chat.messages.length;
+    const gone = chat.messages.find(m => m.u && m.id === msgId);
     chat.messages = chat.messages.filter(m => !(m.u && m.id === msgId));
     this.writeChat(id, chat);
+    // a file sent from DeadChat goes with its message, unless something else still uses it
+    if (gone && gone.a && !chat.messages.some(m => m.a && m.a.f === gone.a.f)) {
+      fs.rmSync(path.join(this.chatDir(id), 'media', gone.a.f), { force: true });
+    }
     return before !== chat.messages.length;
+  }
+
+  /** Adds an undelivered photo, video, file, voice note or sticker. `src` is a file path or a Buffer. */
+  addLocalMedia(id, src, name, kind, now = new Date()) {
+    const chat = this.readChat(id);
+    if (chat.me < 0) throw new Error('Choose which side is you first (chat menu → Switch which side is me).');
+    const pad = n => String(n).padStart(2, '0');
+    const day = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+    const ext = (path.extname(name) || '.bin').toLowerCase();
+    const prefix = kind === 'audio' && /^PTT-/.test(name) ? 'PTT' : kind === 'sticker' ? 'STK' : kind === 'image' ? 'IMG' : kind === 'video' ? 'VID' : 'DOC';
+    const f = kind === 'document' ? `DC-${crypto.randomBytes(3).toString('hex')}-${path.basename(name)}` : `${prefix}-${day}-DC${crypto.randomBytes(3).toString('hex')}${ext}`;
+    const dest = path.join(this.chatDir(id), 'media', f);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    if (Buffer.isBuffer(src)) fs.writeFileSync(dest, src); else fs.copyFileSync(src, dest);
+    const t = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), now.getSeconds());
+    const msg = { t, s: chat.me, x: '', a: { f, k: kind }, u: 1, id: crypto.randomBytes(5).toString('hex') };
+    chat.messages.push(msg);
+    this.writeChat(id, chat);
+    return msg;
+  }
+
+  /** Every sticker in every imported chat (one of each file name). */
+  listStickers() {
+    const seen = new Map();
+    for (const c of this.listChats()) {
+      const chat = this.readChat(c.id);
+      for (let k = chat.messages.length - 1; k >= 0; k--) {
+        const m = chat.messages[k];
+        if (!m.a || m.a.k !== 'sticker' || m.a.missing || seen.has(m.a.f)) continue;
+        const p = path.join(this.chatDir(c.id), 'media', m.a.f);
+        if (fs.existsSync(p)) seen.set(m.a.f, { chatId: c.id, f: m.a.f, url: pathToFileURL(p).href });
+      }
+    }
+    return [...seen.values()];
+  }
+
+  addLocalSticker(id, fromChatId, f) {
+    return this.addLocalMedia(id, path.join(this.chatDir(fromChatId), 'media', path.basename(f)), f, 'sticker');
   }
 
   // ---------- re-export ----------

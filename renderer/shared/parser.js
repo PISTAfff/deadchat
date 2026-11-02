@@ -14,6 +14,7 @@ function clean(s) {
 
 function kindOf(file) {
   const ext = file.split('.').pop().toLowerCase();
+  if (/^PTT-/i.test(file)) return 'audio';
   if (/^STK-/i.test(file) || ext === 'webp') return 'sticker';
   if (['jpg', 'jpeg', 'png', 'gif', 'heic', 'bmp'].includes(ext)) return 'image';
   if (['opus', 'ogg', 'm4a', 'mp3', 'aac', 'amr', 'wav'].includes(ext)) return 'audio';

@@ -38,4 +38,7 @@
 
     <!-- DeadChat never goes online: no internet permission, and remove it if a library adds one. -->
     <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <!-- only for recording voice notes you keep in DeadChat -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 </manifest>

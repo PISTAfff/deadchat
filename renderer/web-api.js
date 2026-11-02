@@ -43,7 +43,7 @@
   })();
   const mediaBase = id => new URL(`dcmedia/${id}/`, location.href).href;
   const avatarUrl = (id, chat) => chat.avatar ? new URL(`dcavatar/${id}?v=${chat.avatarAt || 0}`, location.href).href : null;
-  const TYPES = { opus: 'audio/ogg', ogg: 'audio/ogg', m4a: 'audio/mp4', mp3: 'audio/mpeg', aac: 'audio/aac', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', mp4: 'video/mp4', '3gp': 'video/3gpp', pdf: 'application/pdf' };
+  const TYPES = { webm: 'audio/webm', opus: 'audio/ogg', ogg: 'audio/ogg', m4a: 'audio/mp4', mp3: 'audio/mpeg', aac: 'audio/aac', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', mp4: 'video/mp4', '3gp': 'video/3gpp', pdf: 'application/pdf' };
   const typeOf = f => TYPES[(f.split('.').pop() || '').toLowerCase()] || 'application/octet-stream';
 
   // ---------- picking files ----------
@@ -98,6 +98,32 @@
     const { uri } = await fs.getUri({ path, directory: 'CACHE' });
     await share.share({ title: name, files: [uri] });
     return name;
+  }
+
+  function pickFiles() {
+    return new Promise(resolve => {
+      const input = document.createElement('input');
+      input.type = 'file'; input.multiple = true;
+      input.addEventListener('change', () => resolve([...input.files]), { once: true });
+      input.addEventListener('cancel', () => resolve([]), { once: true });
+      input.click();
+    });
+  }
+  async function addMedia(id, blob, name, kind) {
+    const c = await get('chats', id);
+    if (c.me < 0) throw new Error('Choose which side is you first (chat menu → Switch which side is me).');
+    const n = new Date(), pad = x => String(x).padStart(2, '0');
+    const day = `${n.getFullYear()}${pad(n.getMonth() + 1)}${pad(n.getDate())}`;
+    const ext = (name.match(/\.[^.]+$/) || ['.bin'])[0].toLowerCase();
+    const rnd = Math.random().toString(16).slice(2, 8);
+    const prefix = kind === 'audio' ? 'PTT' : kind === 'sticker' ? 'STK' : kind === 'image' ? 'IMG' : kind === 'video' ? 'VID' : 'DOC';
+    const f = kind === 'document' ? `DC-${rnd}-${name}` : `${prefix}-${day}-DC${rnd}${ext}`;
+    await put('media', `${id}/${f}`, new Blob([blob], { type: blob.type || typeOf(f) }));
+    const t = Date.UTC(n.getFullYear(), n.getMonth(), n.getDate(), n.getHours(), n.getMinutes(), n.getSeconds());
+    const msg = { t, s: c.me, x: '', a: { f, k: kind }, u: 1, id: Math.random().toString(16).slice(2, 12) };
+    c.messages.push(msg);
+    await put('chats', id, c);
+    return msg;
   }
 
   // ---------- the API (same shape as preload.js) ----------
@@ -159,9 +185,37 @@
     async unwriteMessage(id, msgId) {
       const c = await get('chats', id);
       const n = c.messages.length;
+      const gone = c.messages.find(m => m.u && m.id === msgId);
       c.messages = c.messages.filter(m => !(m.u && m.id === msgId));
       await put('chats', id, c);
+      if (gone && gone.a && !c.messages.some(m => m.a && m.a.f === gone.a.f)) await del('media', `${id}/${gone.a.f}`);
       return n !== c.messages.length;
+    },
+    async attachFiles(id) {
+      const files = await pickFiles();
+      const out = [];
+      for (const file of files) {
+        const k = DC.kindOf(file.name);
+        out.push(await addMedia(id, file, file.name, k === 'sticker' ? 'image' : k));
+      }
+      return out;
+    },
+    async sendVoice(id, blob) { return addMedia(id, blob, 'PTT-voice.webm', 'audio'); },
+    async listStickers() {
+      const seen = new Map();
+      const have = new Set(await keys('media'));
+      for (const id of await keys('chats')) {
+        const c = await get('chats', id);
+        for (let k = c.messages.length - 1; k >= 0; k--) {
+          const m = c.messages[k];
+          if (m.a && m.a.k === 'sticker' && !seen.has(m.a.f) && have.has(`${id}/${m.a.f}`)) seen.set(m.a.f, { chatId: id, f: m.a.f, url: mediaBase(id) + encodeURIComponent(m.a.f) });
+        }
+      }
+      return [...seen.values()];
+    },
+    async sendSticker(id, fromChatId, f) {
+      const blob = await get('media', `${fromChatId}/${f}`);
+      return addMedia(id, blob, f, 'sticker');
     },
     async exportChat(id, { includeMedia = true, includeUndelivered = true } = {}) {
       const c = await get('chats', id);

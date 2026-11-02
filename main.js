@@ -3,6 +3,7 @@ const { app, BrowserWindow, ipcMain, dialog, session, shell, clipboard } = requi
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { Store, suggestMapping } = require('./src/importer');
+const { kindOf } = require('./renderer/shared/parser');
 
 let store, win;
 
@@ -36,7 +37,9 @@ app.whenReady().then(() => {
   session.defaultSession.webRequest.onBeforeRequest((details, cb) => {
     cb({ cancel: !/^(file|devtools|data|blob):/i.test(details.url) });
   });
-  session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+  session.defaultSession.setPermissionRequestHandler((_wc, perm, cb, details) =>
+    cb(perm === 'media' && (details.mediaTypes || []).every(t => t === 'audio')));
+  session.defaultSession.setPermissionCheckHandler((_wc, perm) => perm === 'media');
 
   store = new Store(path.join(app.getPath('userData'), 'library'));
   createWindow();
@@ -80,6 +83,14 @@ handle('chats:delete', async id => {
 });
 
 handle('chats:write', (id, text) => store.addLocalMessage(id, text));
+handle('local:attach', async id => {
+  const r = await dialog.showOpenDialog(win, { properties: ['openFile', 'multiSelections'] });
+  if (r.canceled) return [];
+  return r.filePaths.map(p => store.addLocalMedia(id, p, path.basename(p), kindOf(path.basename(p)) === 'sticker' ? 'image' : kindOf(path.basename(p))));
+});
+handle('local:voice', (id, bytes) => store.addLocalMedia(id, Buffer.from(bytes), 'PTT-voice.webm', 'audio'));
+handle('stickers:list', () => store.listStickers());
+handle('local:sticker', (id, fromChatId, f) => store.addLocalSticker(id, fromChatId, f));
 handle('chats:unwrite', (id, msgId) => store.deleteLocalMessage(id, msgId));
 handle('chats:export', async (id, opts) => {
   const c = store.readChat(id);
