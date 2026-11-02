@@ -491,3 +491,35 @@ button:active:not(:disabled) { transform: scale(.93); }
 .ep-body.stickers img { width: 100%; height: auto; aspect-ratio: 1 / 1; object-fit: contain; }
 .composer textarea { overflow-y: auto; scrollbar-width: none; }
 .composer textarea::-webkit-scrollbar { width: 0; height: 0; }
+
+/* recording, like WhatsApp: timer + live waveform, then trash · pause · send */
+.composer.recording { flex-direction: column; align-items: stretch; gap: 10px; padding-top: 12px; padding-bottom: 12px; }
+.composer.recording .c-bar, .composer.recording > .send { display: none; }
+.rec-panel { display: flex; flex-direction: column; gap: 12px; width: 100%; animation: rise .18s ease; }
+.rec-panel[hidden] { display: none !important; }
+.rec-top { display: flex; align-items: center; gap: 14px; padding: 0 6px; }
+.rec-time { font-size: 16px; color: var(--text); font-variant-numeric: tabular-nums; min-width: 42px; }
+.rec-wave { flex: 1; height: 34px; display: flex; align-items: center; justify-content: flex-end; gap: 2px; overflow: hidden; }
+.rec-wave i { width: 3px; flex: none; border-radius: 2px; background: #c9d1d5; animation: grow .12s ease; }
+.rec-wave i.dot { height: 3px; width: 3px; border-radius: 50%; background: #8696a0; }
+@keyframes grow { from { transform: scaleY(.2); } to { transform: scaleY(1); } }
+.composer.rec-paused .rec-wave i { background: #8696a0; }
+.rec-controls { display: flex; align-items: center; gap: 12px; }
+.rec-trash { width: 52px; height: 52px; border-radius: 50%; background: #f15c6d33; color: #f15c6d; display: grid; place-items: center; flex: none; }
+.rec-trash svg { width: 24px; height: 24px; }
+.rec-pause { flex: 1; height: 52px; border-radius: 26px; background: var(--hover); color: var(--text); display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 15px; }
+.rec-pause .ico svg { width: 24px; height: 24px; display: block; }
+.rec-pause .i-pause { stroke-width: 3; }
+.rec-pause .i-resume { display: none !important; fill: #f15c6d; stroke: none; }
+.composer.rec-paused .rec-pause .i-pause { display: none; }
+.composer.rec-paused .rec-pause .i-resume { display: block !important; }
+.rec-send { width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: var(--bone); display: grid; place-items: center; flex: none; }
+.rec-send svg { width: 26px; height: 26px; fill: currentColor; stroke: none; }
+@media (min-width: 769px) {
+  .rec-panel { flex-direction: row; align-items: center; }
+  .rec-top { flex: 1; order: 2; }
+  .rec-controls { display: contents; }
+  .rec-trash { order: 1; width: 42px; height: 42px; }
+  .rec-pause { order: 3; flex: none; width: auto; padding: 0 16px; height: 42px; }
+  .rec-send { order: 4; width: 46px; height: 46px; }
+}

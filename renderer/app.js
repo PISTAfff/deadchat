@@ -844,12 +844,36 @@ async function startRecording() {
     const mr = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
     const chunks = [];
     mr.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-    rec = { mr, stream, chunks, start: Date.now(), keep: false };
-    rec.timer = setInterval(() => { $('#rec-time').textContent = fmtDur((Date.now() - rec.start) / 1000); }, 250);
+    rec = { mr, stream, chunks, keep: false, elapsed: 0, since: Date.now(), paused: false };
+    const secs = () => (rec.elapsed + (rec.paused ? 0 : Date.now() - rec.since)) / 1000;
+    rec.timer = setInterval(() => { if (rec) $('#rec-time').textContent = fmtDur(secs()); }, 200);
+    // live waveform from the microphone level, like WhatsApp: bars while you speak, dots in silence
+    const wave = $('#rec-wave'); wave.innerHTML = '';
+    try {
+      const ac = new AudioContext(), an = ac.createAnalyser();
+      an.fftSize = 512;
+      ac.createMediaStreamSource(stream).connect(an);
+      const buf = new Uint8Array(an.fftSize);
+      rec.ac = ac;
+      rec.levels = setInterval(() => {
+        if (!rec || rec.paused) return;
+        an.getByteTimeDomainData(buf);
+        let sum = 0; for (const v of buf) sum += (v - 128) * (v - 128);
+        const rms = Math.sqrt(sum / buf.length) / 128;
+        const bar = document.createElement('i');
+        const h = Math.min(1, rms * 4.5);
+        if (h < 0.06) bar.className = 'dot'; else bar.style.height = Math.round(18 + h * 82) + '%';
+        wave.append(bar);
+        const max = Math.floor(wave.clientWidth / 5);
+        while (wave.children.length > max && max > 0) wave.firstChild.remove();
+      }, 90);
+    } catch { /* waveform is decoration only */ }
     mr.onstop = async () => {
       const r = rec; rec = null;
-      clearInterval(r.timer);
+      clearInterval(r.timer); clearInterval(r.levels);
+      try { r.ac && r.ac.close(); } catch { /* already closed */ }
       r.stream.getTracks().forEach(t => t.stop());
+      document.querySelector('.composer').classList.remove('rec-paused');
       document.querySelector('.composer').classList.remove('recording');
       $('#rec-bar').hidden = true; $('#rec-time').textContent = '0:00';
       if (!r.keep || !r.chunks.length) return;
@@ -863,8 +887,17 @@ async function startRecording() {
     $('#rec-bar').hidden = false;
   } catch (err) { toast('Microphone not available: ' + err.message); }
 }
-function stopRecording(keep) { if (!rec) return; rec.keep = keep; rec.mr.stop(); }
+function stopRecording(keep) { if (!rec) return; rec.keep = keep; if (rec.mr.state === 'paused') rec.mr.resume(); rec.mr.stop(); }
 $('#rec-cancel').onclick = () => stopRecording(false);
+$('#rec-send').onclick = () => stopRecording(true);
+$('#rec-pause').onclick = () => {
+  if (!rec) return;
+  const comp = document.querySelector('.composer');
+  if (rec.paused) { rec.mr.resume(); rec.paused = false; rec.since = Date.now(); }
+  else { rec.mr.pause(); rec.paused = true; rec.elapsed += Date.now() - rec.since; }
+  comp.classList.toggle('rec-paused', rec.paused);
+  $('#rec-pause .lbl').textContent = rec.paused ? 'Resume' : 'Pause';
+};
 
 async function sendLocal() {
   const text = compose.value.replace(/\s+$/, '');
