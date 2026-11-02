@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeadChat Brand</title>
+<style>
+  :root {
+    --midnight: #0b141a; --panel: #111b21; --panel-2: #202c33;
+    --ember: #c0394b; --bone: #ece5dd; --ash: #8696a0; --sent: #005c4b;
+    --line: #222d34;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--midnight); color: var(--bone); font: 15px/1.6 "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 56px 16px 96px; }
+  h1, h2 { font-weight: 600; letter-spacing: -.3px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .14em; color: var(--ash); margin: 64px 0 18px; font-weight: 600; }
+  p { color: #c9cfd2; max-width: 62ch; }
+  .hero { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+  .hero img { width: 132px; height: 132px; }
+  .wordmark { font-size: 56px; font-weight: 600; letter-spacing: -1.5px; line-height: 1; }
+  .wordmark .dead { color: var(--ash); font-weight: 400; }
+  .tag { font-size: 18px; margin-top: 10px; display: flex; align-items: center; gap: 6px; }
+  .tick { width: 18px; height: 18px; fill: none; stroke: var(--ash); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .sw { height: 92px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #ffffff12; }
+  .sw-name { font-weight: 600; }
+  .mono { font-family: Consolas, "Cascadia Mono", monospace; color: var(--ash); font-size: 13px; }
+  .marks { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+  .marks .card { display: grid; place-items: center; min-height: 190px; gap: 10px; }
+  .marks img { width: 96px; height: 96px; }
+  .on-bone { background: var(--bone); }
+  .on-bone .wordmark-s { color: var(--midnight); }
+  .wordmark-s { font-size: 26px; font-weight: 600; letter-spacing: -.5px; }
+  .wordmark-s .dead { color: var(--ash); font-weight: 400; }
+  .bubbles { display: flex; flex-direction: column; gap: 6px; max-width: 420px; }
+  .b { padding: 7px 10px; border-radius: 8px; max-width: 80%; font-size: 14px; }
+  .b.in { background: var(--panel-2); align-self: flex-start; }
+  .b.out { background: var(--sent); align-self: flex-end; }
+  .b small { color: #ffffff8f; font-size: 11px; margin-left: 10px; display: inline-flex; align-items: center; gap: 2px; }
+  .b .tick { width: 15px; height: 15px; stroke: #ffffff8f; }
+  .type-serif { font-family: Georgia, "Palatino Linotype", serif; font-size: 24px; line-height: 1.5; }
+  ul { padding-left: 18px; color: #c9cfd2; }
+  li { margin: 6px 0; }
+  .do, .dont { border-left: 3px solid var(--sent); padding-left: 14px; }
+  .dont { border-color: var(--ember); }
+</style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <img src="mark.svg" alt="DeadChat mark">
+    <div>
+      <div class="wordmark"><span class="dead">dead</span>chat</div>
+      <div class="tag">Never delivered. <svg class="tick" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+    </div>
+  </section>
+
+  <h2>Idea</h2>
+  <p>DeadChat is a quiet place for conversations that ended. You can scroll back, listen again, and write the things you never sent. Its symbol is the single grey tick: a message that left you and never arrived. The brand should feel calm and private, a little like keeping a letter in a drawer. It's for remembering, not for social media.</p>
+
+  <h2>Mark</h2>
+  <div class="marks">
+    <div class="card"><img src="icon.svg" alt="App icon"><span class="mono">App icon · icon.svg</span></div>
+    <div class="card"><img src="mark.svg" alt="Mark"><span class="mono">Mark · mark.svg</span></div>
+    <div class="card"><span class="wordmark-s"><span class="dead">dead</span>chat</span><span class="mono">Wordmark on Midnight</span></div>
+    <div class="card on-bone"><span class="wordmark-s"><span class="dead">dead</span>chat</span><span class="mono" style="color:#5b6670">Wordmark on Bone</span></div>
+  </div>
+  <p>The mark is an Ember speech bubble with two lines of text and one tick in the corner. It's always written lowercase: <b>dead</b> in Ash at normal weight, <b>chat</b> in Bone at semibold, so the word fades in from the dark.</p>
+
+  <h2>Colour</h2>
+  <div class="grid">
+    <div class="card"><div class="sw" style="background:#0b141a"></div><div class="sw-name">Midnight</div><div class="mono">#0B141A · background</div></div>
+    <div class="card"><div class="sw" style="background:#c0394b"></div><div class="sw-name">Ember</div><div class="mono">#C0394B · brand, primary action</div></div>
+    <div class="card"><div class="sw" style="background:#ece5dd"></div><div class="sw-name">Bone</div><div class="mono">#ECE5DD · text, ticks on Ember</div></div>
+    <div class="card"><div class="sw" style="background:#8696a0"></div><div class="sw-name">Ash</div><div class="mono">#8696A0 · the undelivered tick, quiet text</div></div>
+  </div>
+  <p>Ember is the only warm colour, so use it sparingly: the mark, the main button, the active tab. Inside a chat, the bubbles keep their familiar WhatsApp colours so old conversations look the way you remember them.</p>
+
+  <h2>Type</h2>
+  <div class="card">
+    <div style="font-size:26px;font-weight:600;letter-spacing:-.4px">Segoe UI: interface</div>
+    <p style="margin:6px 0 22px">Plain and native to Windows. It handles English and Arabic in the same line.</p>
+    <div class="type-serif">Georgia: long-form writing</div>
+    <p style="margin:6px 0 0">For anything meant to be read slowly. Set larger, with room between lines.</p>
+  </div>
+
+  <h2>The tick</h2>
+  <div class="card">
+    <div class="bubbles">
+      <div class="b in">you still up?<small>2:14 am</small></div>
+      <div class="b out">i wrote something for you<small>2:16 am <svg class="tick" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></small></div>
+    </div>
+  </div>
+  <p>Messages written in DeadChat keep one grey tick forever. It isn't an error, so never colour it red. It's the honest state of the message: written, kept, and not sent.</p>
+
+  <h2>Voice</h2>
+  <div class="grid">
+    <div class="card do"><b>Say</b><ul><li>Never delivered.</li><li>Nothing leaves this computer.</li><li>Date not written.</li></ul></div>
+    <div class="card dont"><b>Avoid</b><ul><li>Exclamation marks and cheerful copy</li><li>“Sync”, “share”, “cloud”</li><li>Guessing when facts are missing</li></ul></div>
+  </div>
+  <p>Write short, plain and gentle, and be honest about what the app can't do.</p>
+</main>
+</body>
+</html>

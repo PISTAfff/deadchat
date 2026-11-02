@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>DeadChat mark: a message left on one tick</title>
+  <path d="M172 112h168a76 76 0 0 1 76 76v88a76 76 0 0 1-76 76H228l-98 58 24-60a76 76 0 0 1-58-74v-88a76 76 0 0 1 76-76z" fill="#C0394B"/>
+  <rect x="160" y="170" width="196" height="28" rx="14" fill="#ECE5DD"/>
+  <rect x="160" y="222" width="124" height="28" rx="14" fill="#ECE5DD" fill-opacity=".55"/>
+  <path d="M300 290l18 18 38-40" fill="none" stroke="#ECE5DD" stroke-opacity=".8" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

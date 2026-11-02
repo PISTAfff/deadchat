@@ -1,0 +1,97 @@
+{
+  "name": "deadchat",
+  "productName": "DeadChat",
+  "version": "1.0.0",
+  "description": "A private, offline, read-only home for old WhatsApp chats. Import an export, scroll back, play the voice notes, write what you never sent.",
+  "main": "main.js",
+  "license": "MIT",
+  "author": {
+    "name": "Abdelrahman Yehia Ibrahim",
+    "email": "89707107+PISTAfff@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/PISTAfff/deadchat",
+  "repository": "github:PISTAfff/deadchat",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/deadchat.test.js",
+    "icon": "electron brand/render-icon.js",
+    "dist": "electron-builder --publish never"
+  },
+  "dependencies": {
+    "adm-zip": "0.5.16"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "io.github.pistafff.deadchat",
+    "productName": "DeadChat",
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**",
+      "renderer/**",
+      "build/icon.png",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "publish": null,
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "${productName}-${version}-windows-setup.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.utilities",
+      "identity": null
+    },
+    "dmg": {
+      "artifactName": "${productName}-${version}-mac-universal.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "maintainer": "Abdelrahman Yehia Ibrahim <89707107+PISTAfff@users.noreply.github.com>",
+      "synopsis": "Offline, read-only viewer for WhatsApp chat exports"
+    }
+  }
+}

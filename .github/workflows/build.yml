@@ -1,0 +1,58 @@
+name: Build
+
+# Every push to a branch: test and build DeadChat for Windows, macOS and Linux (no release).
+# The installers are kept for a week under the run's Artifacts.
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: --win
+          - os: macos-latest
+            target: --mac
+          - os: ubuntu-22.04
+            target: --linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+
+      - name: Build installers
+        run: npx electron-builder ${{ matrix.target }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      # Unsigned Apple silicon builds need at least an ad-hoc signature to open.
+      - name: Ad-hoc sign the macOS app
+        if: runner.os == 'macOS'
+        run: |
+          app=$(ls -d dist/mac-universal/*.app)
+          codesign --force --deep -s - "$app"
+          rm -f dist/*.dmg
+          npx electron-builder --mac --universal --prepackaged "$app" --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deadchat-${{ runner.os }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+          retention-days: 7
+          if-no-files-found: error
