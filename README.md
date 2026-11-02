@@ -3,6 +3,8 @@
 <h1 align="center">deadchat</h1>
 <p align="center"><b>Never delivered.</b><br>A private, offline, read-only home for old WhatsApp chats.</p>
 
+<p align="center"><img src="docs/screens/desktop-chat.png" width="760" alt="DeadChat showing a demo chat"></p>
+
 ---
 
 DeadChat opens the chat exports WhatsApp makes ("Export chat") and lets you scroll through them the way they looked: bubbles, voice notes, photos, stickers and all. Nothing is ever sent or received, and the app never goes online.
@@ -73,6 +75,15 @@ You need JDK 17+ and the Android SDK. Release signing reads `DEADCHAT_KEYSTORE`,
 ### Releases
 
 Pushing a tag like `v1.0.1` runs the Release workflow. It builds the Windows, macOS, Linux and Android versions and publishes them as one GitHub Release. To sign the APK in CI, add `ANDROID_KEYSTORE_B64` (the keystore, base64) and `ANDROID_KEYSTORE_PASSWORD` as repository secrets.
+
+## Screenshots
+
+All screenshots use an invented demo chat.
+
+| | |
+|---|---|
+| ![Contact info](docs/screens/desktop-contact-info.png) | ![Stickers](docs/screens/desktop-stickers.png) |
+| ![Photo viewer](docs/screens/desktop-photo-viewer.png) | ![On a phone](docs/screens/phone-chat.png) |
 
 ## License
 
