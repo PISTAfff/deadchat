@@ -297,3 +297,7 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
   .lb-nav { display: none !important; }
   .thumb { width: 46px; height: 46px; }
 }
+
+/* dialog buttons line up */
+.modal-actions { align-items: center; }
+.modal-actions .primary, .modal-actions .ghost { margin-top: 0; }

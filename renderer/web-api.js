@@ -165,7 +165,9 @@
       return { messages: lines, media: files.length, file: name };
     },
     async pickSource() {
-      const file = await pickFile('.zip,.txt,application/zip,text/plain');
+      // no type filter: Android's picker often hides zips otherwise; the type is checked after picking
+      const file = await pickFile('');
+      if (file && !/\.(zip|txt)$/i.test(file.name)) throw new Error('Pick the .zip or .txt that WhatsApp exported.');
       if (!file) return null;
       const token = 'pick' + (++pickN);
       picked.set(token, file);
