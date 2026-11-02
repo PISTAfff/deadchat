@@ -527,3 +527,7 @@ button:active:not(:disabled) { transform: scale(.93); }
 /* the dot glides with playback */
 .wave .dot { will-change: left; }
 .wave i { transition: background-color .08s linear; }
+
+/* bars span the whole waveform, so the dot ends exactly on the last bar */
+.wave { justify-content: space-between; gap: 0; }
+.wave i { flex: 0 0 3px; max-width: 3px; min-width: 3px; }
