@@ -333,9 +333,12 @@ function waveBars(name) {
 }
 
 function voiceHtml(i, meta = '') {
-  const m = S.chat.messages[i], dur = durations.get(i), playing = playingIdx === i;
+  const m = S.chat.messages[i], playing = playingIdx === i;
+  if (!durations.has(i) && cachedWave(m.a.f) && durByFile.has(m.a.f)) durations.set(i, durByFile.get(m.a.f));
+  const dur = durations.get(i);
   const name = (S.chat.participants[m.s]?.name || '?').normalize('NFKC').replace(/[^\p{L}\p{N}]/gu, '');
-  const bars = waveBars(m.a.f).map(v => `<i class="h${Math.round(v / 10)}"></i>`).join('');
+  // real waveform once it has been measured; a flat line until then
+  const bars = (cachedWave(m.a.f) || Array(BARS).fill(1)).map(v => `<i class="h${v}"></i>`).join('');
   return `<div class="voice${playing ? ' playing' : ''}" data-voice="${i}">
     <button class="play" title="Play">${playing && !player.paused ? PAUSE : PLAY}</button>
     <div class="v-main">
@@ -409,25 +412,73 @@ player.addEventListener('ended', () => {
   }
 });
 
-// fetch durations lazily for voice notes that scroll into view
+// ---------- real waveforms: decode each voice note once, remember its loudness shape ----------
+const waveCache = new Map();
+function cachedWave(f) {
+  if (waveCache.has(f)) return waveCache.get(f);
+  const v = store.get('wave:' + f, null);
+  if (v && v.w) { waveCache.set(f, v.w); if (v.d) durByFile.set(f, v.d); return v.w; }
+  return null;
+}
+const durByFile = new Map();
+let decodeCtx = null, waveQueue = Promise.resolve();
+const measuring = new Set();
+
+function measureVoice(i) {
+  const m = S.chat && S.chat.messages[i];
+  if (!m || !m.a) return;
+  const f = m.a.f, chatId = S.chatId;
+  if (cachedWave(f)) { applyWave(f); return; }
+  if (measuring.has(f)) return;
+  measuring.add(f);
+  waveQueue = waveQueue.then(async () => {
+    try {
+      const bytes = await api.readMedia(chatId, f);
+      decodeCtx = decodeCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      const audio = await decodeCtx.decodeAudioData(ab);
+      const data = audio.getChannelData(0), step = Math.max(1, Math.floor(data.length / BARS));
+      const rms = [];
+      for (let b = 0; b < BARS; b++) {
+        let sum = 0; const from = b * step, to = Math.min(data.length, from + step);
+        for (let k = from; k < to; k++) sum += data[k] * data[k];
+        rms.push(Math.sqrt(sum / Math.max(1, to - from)));
+      }
+      const peak = Math.max(...rms) || 1;
+      const w = rms.map(r => Math.max(1, Math.min(10, Math.round(Math.pow(r / peak, 0.7) * 10))));
+      waveCache.set(f, w); durByFile.set(f, audio.duration);
+      store.set('wave:' + f, { w, d: Math.round(audio.duration * 10) / 10 });
+      applyWave(f);
+    } catch { /* unreadable or missing file: keep the flat line */ }
+    measuring.delete(f);
+  });
+}
+
+// redraw the bars (and length) of every visible voice note that uses this file
+function applyWave(f) {
+  const w = waveCache.get(f); if (!w) return;
+  document.querySelectorAll('#messages [data-voice]').forEach(v => {
+    const i = +v.dataset.voice, m = S.chat.messages[i];
+    if (!m || !m.a || m.a.f !== f) return;
+    v.querySelectorAll('.wave i').forEach((b, k) => { b.className = `h${w[k]}` + (b.classList.contains('on') ? ' on' : ''); });
+    const d = durByFile.get(f);
+    if (d && !durations.has(i)) { durations.set(i, d); if (playingIdx !== i) v.querySelector('.v-time').textContent = fmtDur(d); }
+  });
+}
+
 const durObserver = new IntersectionObserver(entries => {
   for (const e of entries) {
-    if (!e.isIntersecting) continue;
-    const i = +e.target.dataset.voice;
+    if (!e.isIntersecting || !S.chat) continue;
     durObserver.unobserve(e.target);
-    if (durations.has(i) || !S.chat) continue;
-    const probe = new Audio(); probe.preload = 'metadata';
-    probe.addEventListener('loadedmetadata', () => {
-      durations.set(i, probe.duration);
-      const v = voiceNode(i); if (v && playingIdx !== i) v.querySelector('.v-time').textContent = fmtDur(probe.duration);
-      probe.src = '';
-    }, { once: true });
-    probe.src = mediaUrl(S.chat.messages[i].a.f);
+    measureVoice(+e.target.dataset.voice);
   }
-}, { root: null, rootMargin: '200px' });
+}, { root: null, rootMargin: '300px' });
 
 function observeVoices() {
-  document.querySelectorAll('#messages [data-voice]').forEach(v => { if (!durations.has(+v.dataset.voice)) durObserver.observe(v); });
+  document.querySelectorAll('#messages [data-voice]').forEach(v => {
+    const m = S.chat.messages[+v.dataset.voice];
+    if (!m || !m.a || !cachedWave(m.a.f) || !durations.has(+v.dataset.voice)) durObserver.observe(v);
+  });
   if (playingIdx != null) updateVoiceUI();
 }
 

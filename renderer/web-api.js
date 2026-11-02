@@ -201,6 +201,11 @@
       return out;
     },
     async sendVoice(id, blob) { return addMedia(id, blob, 'PTT-voice.webm', 'audio'); },
+    async readMedia(id, f) {
+      const blob = await get('media', `${id}/${f}`);
+      if (!blob) throw new Error('missing');
+      return new Uint8Array(await blob.arrayBuffer());
+    },
     async listStickers() {
       const seen = new Map();
       const have = new Set(await keys('media'));

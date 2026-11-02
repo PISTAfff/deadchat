@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
   attachFiles: id => call('local:attach', id),
   sendVoice: (id, bytes) => call('local:voice', id, bytes),
   listStickers: () => call('stickers:list'),
+  readMedia: (id, f) => call('media:read', id, f),
   sendSticker: (id, fromChatId, f) => call('local:sticker', id, fromChatId, f),
   unwriteMessage: (id, msgId) => call('chats:unwrite', id, msgId),
   exportChat: (id, opts) => call('chats:export', id, opts),

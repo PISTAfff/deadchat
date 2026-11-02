@@ -90,6 +90,8 @@ handle('local:attach', async id => {
 });
 handle('local:voice', (id, bytes) => store.addLocalMedia(id, Buffer.from(bytes), 'PTT-voice.webm', 'audio'));
 handle('stickers:list', () => store.listStickers());
+// raw bytes of one media file, so the window can draw a voice note's real waveform
+handle('media:read', (id, f) => require('fs').readFileSync(path.join(store.chatDir(id), 'media', path.basename(f))));
 handle('local:sticker', (id, fromChatId, f) => store.addLocalSticker(id, fromChatId, f));
 handle('chats:unwrite', (id, msgId) => store.deleteLocalMessage(id, msgId));
 handle('chats:export', async (id, opts) => {
