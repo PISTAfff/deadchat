@@ -71,9 +71,15 @@
           <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" /></svg>
         </button>
         <footer class="composer">
-          <textarea id="compose" rows="1" dir="auto" placeholder="Type a message · it will never be delivered"></textarea>
-          <button class="send" id="send" title="Leave it here (Enter)" disabled>
-            <svg viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-2.5-6.5z" /></svg>
+          <div class="emoji-panel" id="emoji-panel" hidden></div>
+          <div class="c-bar">
+            <button class="c-btn" id="emoji-btn" title="Emoji">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M8.5 14.5c.9 1.3 2.1 2 3.5 2s2.6-.7 3.5-2" /><circle cx="9" cy="10" r=".6" /><circle cx="15" cy="10" r=".6" /></svg>
+            </button>
+            <textarea id="compose" rows="1" dir="auto" placeholder="Type a message"></textarea>
+          </div>
+          <button class="send" id="send" title="Send (Enter) · it stays here, never delivered" disabled>
+            <svg viewBox="0 0 24 24"><path d="M3.4 20.4l17.4-7.5c.8-.4.8-1.5 0-1.8L3.4 3.6c-.7-.3-1.4.3-1.2 1L4 11l9 1-9 1-1.8 6.4c-.2.7.5 1.3 1.2 1z" /></svg>
           </button>
         </footer>
       </section>

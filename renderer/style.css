@@ -324,3 +324,91 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .msg, .sys, .day { contain: layout style; }
 .media-img { aspect-ratio: auto 4 / 3; }
 .info-body { overscroll-behavior: contain; scroll-behavior: smooth; }
+
+/* ---------- chat area like WhatsApp ---------- */
+/* an original, faint doodle wallpaper behind the messages */
+.messages {
+  background-color: #0b141a;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.03' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 22h22a6 6 0 0 1 6 6v10a6 6 0 0 1-6 6H28l-8 6 2-6a6 6 0 0 1-4-6V28a6 6 0 0 1 6-6z'/%3E%3Cpath d='M98 30l6 6 12-13'/%3E%3Ccircle cx='132' cy='92' r='9'/%3E%3Cpath d='M128 92h8M132 88v8'/%3E%3Cpath d='M30 108c0-6 8-9 11-3 3-6 11-3 11 3 0 7-11 13-11 13s-11-6-11-13z'/%3E%3Cpath d='M78 128c6-3 12-3 18 0'/%3E%3Cpath d='M70 70l5 2-2 5'/%3E%3Cpath d='M118 140a8 8 0 1 0 14-6'/%3E%3Cpath d='M62 18l3 7 7 1-5 5 1 7-6-4-6 4 1-7-5-5 7-1z'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+
+/* composer, as in WhatsApp Desktop */
+.composer { background: var(--panel-2); padding: 6px 16px 6px 10px; display: flex; align-items: flex-end; gap: 8px; position: relative; min-height: 62px; }
+.c-bar { flex: 1; display: flex; align-items: flex-end; gap: 4px; background: var(--hover); border-radius: 8px; padding: 0 4px; min-height: 42px; }
+.c-btn { width: 40px; height: 42px; display: grid; place-items: center; color: var(--muted); flex: none; }
+.c-btn:hover { color: var(--text); }
+.c-btn svg { width: 25px; height: 25px; stroke-width: 1.6; }
+.c-btn svg circle[r=".6"] { fill: currentColor; }
+.composer textarea { flex: 1; resize: none; background: transparent; color: var(--text); border: 0; border-radius: 0; padding: 11px 6px 10px; font: inherit; font-size: 15px; line-height: 1.35; max-height: 140px; outline: none; }
+.composer textarea::placeholder { color: var(--muted); }
+.send { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); flex: none; transition: transform .18s ease, background .18s ease, color .18s ease; }
+.send svg { width: 24px; height: 24px; fill: currentColor; stroke: none; }
+.send:disabled { opacity: .45; cursor: default; }
+.composer.typing .send { background: var(--accent); color: var(--bone); opacity: 1; animation: pop .2s ease; }
+.emoji-panel { position: absolute; left: 10px; bottom: 100%; margin-bottom: 8px; width: min(360px, calc(100% - 20px)); max-height: 260px; overflow-y: auto; display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; padding: 10px; background: #233138; border-radius: 12px; box-shadow: 0 8px 28px #000a; z-index: 15; animation: rise .16s ease; }
+.emoji-panel button { font-size: 22px; height: 38px; border-radius: 8px; }
+.emoji-panel button:hover { background: #ffffff14; }
+
+/* bubbles a touch closer to WhatsApp */
+.bubble { padding: 6px 7px 8px 9px; font-size: 14.2px; line-height: 19px; }
+.msg { margin: 1px 0; }
+.msg.first { margin-top: 8px; }
+.meta { font-size: 11px; color: #ffffff99; }
+
+/* ---------- transitions ---------- */
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes pop { from { transform: scale(.6); } to { transform: scale(1); } }
+@keyframes zoom { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes slide-left { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes slide-in-right { from { transform: translateX(100%); } to { transform: none; } }
+#chat-view:not([hidden]) .messages { animation: fade .18s ease; }
+.info-panel:not([hidden]) { animation: slide-left .22s cubic-bezier(.2, .8, .2, 1); }
+.info-body > * { animation: fade .2s ease; }
+.lightbox:not([hidden]) { animation: fade .18s ease; }
+.lightbox:not([hidden]) .lb-stage img, .lightbox:not([hidden]) #lightbox-video { animation: zoom .22s ease; }
+.modal:not([hidden]) { animation: fade .16s ease; }
+.modal:not([hidden]) .modal-card { animation: zoom .2s cubic-bezier(.2, .8, .2, 1); }
+.menu:not([hidden]) { animation: zoom .14s ease; transform-origin: top right; }
+.toast:not([hidden]) { animation: rise .2s ease; }
+.row { transition: background .12s ease; }
+.icon-btn, .pencil, .c-btn { transition: background .12s ease, color .12s ease; }
+.msg.hit .bubble { transition: outline-color .4s ease; }
+
+@media (max-width: 768px) {
+  /* WhatsApp for Android: pill input, round button outside it */
+  .composer { background: transparent; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); min-height: 0; position: relative; }
+  #chat-view { background: #0b141a; }
+  .c-bar { background: #1f2c34; border-radius: 24px; min-height: 48px; padding: 0 6px; }
+  .c-btn { height: 48px; }
+  .composer textarea { padding: 13px 4px 12px; font-size: 16px; }
+  .send { width: 48px; height: 48px; background: var(--accent); color: var(--bone); opacity: 1; }
+  .send:disabled { opacity: .55; }
+  .emoji-panel { left: 6px; width: calc(100% - 12px); grid-template-columns: repeat(8, 1fr); }
+  body.chat-open #main { animation: slide-in-right .26s cubic-bezier(.2, .8, .2, 1); }
+  body:not(.chat-open) #sidebar { animation: fade .2s ease; }
+  .info-panel:not([hidden]) { animation: slide-in-right .26s cubic-bezier(.2, .8, .2, 1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+.emoji-panel { overflow-x: hidden; grid-template-columns: repeat(8, minmax(0, 1fr)); }
+.emoji-panel button { padding: 0; min-width: 0; }
+.emoji-panel::-webkit-scrollbar { width: 6px; }
+.emoji-panel::-webkit-scrollbar-thumb { background: #ffffff22; border-radius: 3px; }
+.emoji-panel::-webkit-scrollbar-track, .emoji-panel::-webkit-scrollbar-corner { background: transparent; }
+
+/* no blue tap square on phones; a gentle press instead */
+* { -webkit-tap-highlight-color: transparent; }
+button { user-select: none; -webkit-user-select: none; touch-action: manipulation; transition: transform .12s ease, background-color .15s ease, color .15s ease, opacity .15s ease, filter .15s ease; }
+button:focus { outline: none; }
+button:focus-visible { outline: 2px solid #ffffff55; outline-offset: 2px; }
+button:active:not(:disabled) { transform: scale(.93); }
+.row:active { background: var(--hover); }
+.row, .emoji-panel button, .thumb, .info-grid img, .gthumb { -webkit-touch-callout: none; }
+.info-grid img, .gthumb, .media-img { transition: transform .12s ease, filter .15s ease; }
+.info-grid img:active, .gthumb:active, .media-img:active { transform: scale(.97); filter: brightness(.9); }
+.primary:hover { filter: brightness(1.08); }
+.send:active:not(:disabled) { transform: scale(.88); }

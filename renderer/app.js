@@ -766,7 +766,27 @@ $('#chat-menu').onclick = async e => {
 
 // ---------- writing (never delivered) ----------
 const compose = $('#compose');
-const fitCompose = () => { compose.style.height = 'auto'; compose.style.height = Math.min(compose.scrollHeight, 140) + 'px'; $('#send').disabled = !compose.value.trim(); };
+const fitCompose = () => {
+  compose.style.height = 'auto';
+  compose.style.height = Math.min(compose.scrollHeight, 140) + 'px';
+  const has = !!compose.value.trim();
+  $('#send').disabled = !has;
+  document.querySelector('.composer').classList.toggle('typing', has);
+};
+
+// emoji picker, like WhatsApp's
+const EMOJI = '😀 😁 😂 🤣 😊 😍 🥰 😘 😅 😭 😢 🥺 😩 😤 😡 🤬 😳 😱 🙄 😏 😌 😴 🤔 🤭 🫠 🤍 🖤 ❤️ 💔 ❤️‍🩹 💕 💗 🌹 🌙 ⭐ ✨ 🔥 💯 👍 👎 👏 🙏 🤝 👀 🫶 🤲 💪 ☠️ 💀 😶 😐 😑 🙃 😇 🤗 🤡 👻 🎉 🎶 🎧 📚 ☕ 🍕 🌊 🏖️ 🚗 ✈️ 📸 💬 ✔️'.split(' ');
+$('#emoji-panel').innerHTML = EMOJI.map(e => `<button data-e="${e}">${e}</button>`).join('');
+$('#emoji-btn').onclick = e => { e.stopPropagation(); $('#emoji-panel').hidden = !$('#emoji-panel').hidden; if (!$('#emoji-panel').hidden) compose.focus(); };
+$('#emoji-panel').addEventListener('click', e => {
+  e.stopPropagation();
+  const b = e.target.closest('[data-e]'); if (!b) return;
+  const s = compose.selectionStart ?? compose.value.length, en = compose.selectionEnd ?? s;
+  compose.value = compose.value.slice(0, s) + b.dataset.e + compose.value.slice(en);
+  compose.selectionStart = compose.selectionEnd = s + b.dataset.e.length;
+  compose.focus(); fitCompose();
+});
+document.addEventListener('click', e => { if (!e.target.closest('#emoji-panel, #emoji-btn')) $('#emoji-panel').hidden = true; });
 compose.addEventListener('input', fitCompose);
 compose.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendLocal(); } });
 $('#send').onclick = sendLocal;
