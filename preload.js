@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('api', {
   renameChat: (id, title) => call('chats:rename', id, title),
   setMe: (id, me) => call('chats:setMe', id, me),
   setAvatar: id => call('chats:setAvatar', id),
+  setProfile: (id, fields) => call('chats:setProfile', id, fields),
   deleteChat: id => call('chats:delete', id),
   writeMessage: (id, text) => call('chats:write', id, text),
   unwriteMessage: (id, msgId) => call('chats:unwrite', id, msgId),

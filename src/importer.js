@@ -90,6 +90,15 @@ class Store {
     return fs.existsSync(p) ? pathToFileURL(p).href + '?v=' + (chat.avatarAt || 0) : null;
   }
 
+  /** Saves the editable contact details shown in Contact info. */
+  setProfile(id, { contactName, bio } = {}) {
+    const chat = this.readChat(id);
+    if (contactName !== undefined) chat.contactName = String(contactName).trim().slice(0, 80) || undefined;
+    if (bio !== undefined) chat.bio = String(bio).trim().slice(0, 700) || undefined;
+    this.writeChat(id, chat);
+    return { contactName: chat.contactName || null, bio: chat.bio || null };
+  }
+
   /** Copies an image in as the chat's profile photo. */
   setAvatar(id, file) {
     const chat = this.readChat(id);

@@ -117,6 +117,13 @@
       if (!c) throw new Error('Chat not found.');
       return { ...c, mediaBase: mediaBase(id), avatarUrl: avatarUrl(id, c) };
     },
+    async setProfile(id, { contactName, bio } = {}) {
+      const c = await get('chats', id);
+      if (contactName !== undefined) c.contactName = String(contactName).trim().slice(0, 80) || undefined;
+      if (bio !== undefined) c.bio = String(bio).trim().slice(0, 700) || undefined;
+      await put('chats', id, c);
+      return { contactName: c.contactName || null, bio: c.bio || null };
+    },
     async renameChat(id, title) { const c = await get('chats', id); c.title = title; await put('chats', id, c); return true; },
     async setMe(id, me) { const c = await get('chats', id); c.me = me; await put('chats', id, c); return true; },
     async setAvatar(id) {

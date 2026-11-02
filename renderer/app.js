@@ -176,7 +176,8 @@ function renderWindow() {
   observeVoices();
 }
 
-function scrollToBottom() { const box = $('#messages'); box.scrollTop = box.scrollHeight; }
+let autoScrolled = false;
+function scrollToBottom() { const box = $('#messages'); autoScrolled = true; box.scrollTop = box.scrollHeight; }
 
 function jumpTo(i, highlight = true) {
   stick = false;
@@ -209,13 +210,22 @@ function keepAnchor(box, a) {
   if (Math.abs(d) > 0.5) box.scrollTop += d;
 }
 
+let scrollFrame = 0;
+function onScrollEvent() {
+  if (scrollFrame) return;
+  scrollFrame = requestAnimationFrame(() => { scrollFrame = 0; onScroll(); });
+}
+
 function onScroll() {
   const box = $('#messages'), n = S.chat ? S.chat.messages.length : 0;
   if (!S.chat || loading) return;
+  // any scroll we didn't cause that leaves the bottom means you're reading: stop following the end
+  if (autoScrolled) autoScrolled = false;
+  else if (box.scrollHeight - box.scrollTop - box.clientHeight > 80) stick = false;
   $('#to-bottom').hidden = S.hi === n && box.scrollHeight - box.scrollTop - box.clientHeight < 400;
   loading = true;
   try {
-    if (box.scrollTop < 600 && S.lo > 0) {
+    if (box.scrollTop < 1500 && S.lo > 0) {
       const from = Math.max(0, S.lo - CHUNK), anchor = anchorOf(box);
       const firstMsg = box.querySelector('[data-i]');
       // drop the day chip of the old first message if it will now continue the same day
@@ -229,7 +239,7 @@ function onScroll() {
       keepAnchor(box, anchor);
       trim('bottom');
       observeVoices();
-    } else if (box.scrollHeight - box.scrollTop - box.clientHeight < 600 && S.hi < n) {
+    } else if (box.scrollHeight - box.scrollTop - box.clientHeight < 1500 && S.hi < n) {
       const to = Math.min(n, S.hi + CHUNK);
       box.querySelector('.edge:last-child')?.remove();
       const frag = document.createDocumentFragment();
@@ -434,11 +444,11 @@ $('#messages').addEventListener('click', e => {
   const a = t.closest('a[data-href]');
   if (a) { api.openLink(a.dataset.href); }
 });
-$('#messages').addEventListener('scroll', onScroll, { passive: true });
+$('#messages').addEventListener('scroll', onScrollEvent, { passive: true });
 $('#lightbox').onclick = e => { if (!e.target.closest('#lightbox-img, #lightbox-video, .lb-bar, .lb-nav, .lb-strip')) closeViewer(); };
 // ---------- contact info + photo viewer (like WhatsApp) ----------
 function otherIndex() { return S.chat.participants.findIndex((_, k) => k !== S.chat.me); }
-function otherName() { return S.chat.participants[otherIndex()]?.name || S.chat.title; }
+function otherName() { return S.chat.contactName || S.chat.participants[otherIndex()]?.name || S.chat.title; }
 
 // Single photos (profile pictures) open on their own; chat media opens as a gallery you can move through.
 const V = { list: null, pos: 0 };
@@ -553,9 +563,22 @@ function openInfo() {
   const total = counts.image + counts.video + counts.document + links;
   $('#info-body').innerHTML = `
     <div class="info-card info-top">
-      <button class="info-photo" id="info-photo">${c.avatarUrl ? `<img src="${esc(c.avatarUrl)}" alt="">` : `<span>${esc(otherName().charAt(0))}</span>`}</button>
-      <div class="info-name" dir="auto">${esc(otherName())}</div>
+      <div class="info-photo-wrap">
+        <button class="info-photo" id="info-photo" title="${c.avatarUrl ? 'View photo' : 'Add a photo'}">${c.avatarUrl ? `<img src="${esc(c.avatarUrl)}" alt="">` : `<span>${esc(otherName().charAt(0))}</span>`}</button>
+        <button class="photo-edit" id="info-photo-edit" title="Change photo"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg></button>
+      </div>
+      <div class="editable" data-field="contactName">
+        <div class="info-name" dir="auto">${esc(otherName())}</div>
+        <button class="pencil" title="Edit name">${PENCIL}</button>
+      </div>
       <div class="info-sub">${esc(c.title)}</div>
+    </div>
+    <div class="info-card">
+      <div class="info-row"><span>About</span></div>
+      <div class="editable about" data-field="bio">
+        <div class="info-about${c.bio ? '' : ' empty'}" dir="auto">${c.bio ? esc(c.bio) : 'Add a few words about them'}</div>
+        <button class="pencil" title="Edit about">${PENCIL}</button>
+      </div>
     </div>
     <div class="info-card">
       <button class="info-row info-link" id="info-all"><span>Media, links and docs</span><span class="muted">${total.toLocaleString()} ›</span></button>
@@ -577,14 +600,59 @@ document.querySelector('.chat-head').addEventListener('click', e => {
 });
 $('#info-close').onclick = closeInfo;
 $('#info-body').addEventListener('click', e => {
-  if (e.target.closest('#info-photo') && S.chat.avatarUrl) {
+  if (e.target.closest('#info-photo-edit') || (e.target.closest('#info-photo') && !S.chat.avatarUrl)) { changePhoto(); return; }
+  if (e.target.closest('#info-photo')) {
     openViewer(S.chat.avatarUrl, { name: otherName(), sub: 'Profile photo', avatar: S.chat.avatarUrl, pfp: true });
   }
+  const pen = e.target.closest('.pencil');
+  if (pen) { editField(pen.closest('.editable')); return; }
   const img = e.target.closest('[data-k]');
   if (img) { openMedia(+img.dataset.k); return; }
   if (e.target.closest('#info-all')) openGallery();
   if (e.target.closest('#gallery-back')) openInfo();
 });
+
+const PENCIL = '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M13.5 6.5l4 4" /></svg>';
+
+async function changePhoto() {
+  try {
+    const url = await api.setAvatar(S.chatId);
+    if (!url) return;
+    S.chat.avatarUrl = url;
+    $('#chat-avatar').outerHTML = avatarHtml(url, S.chat.title, 'chat-avatar');
+    await refreshChats();
+    openInfo();
+    renderWindow();
+    toast('Profile photo updated');
+  } catch (err) { toast(err.message); }
+}
+
+// inline editing for the contact's name and About, saved with the chat
+function editField(box) {
+  const field = box.dataset.field, multi = field === 'bio';
+  const current = field === 'bio' ? (S.chat.bio || '') : otherName();
+  box.innerHTML = multi
+    ? `<textarea class="edit-input" rows="3" maxlength="700" dir="auto" placeholder="Add a few words about them">${esc(current)}</textarea>`
+    : `<input class="edit-input" maxlength="80" dir="auto" value="${esc(current)}">`;
+  box.insertAdjacentHTML('beforeend', '<div class="edit-actions"><button class="ghost" data-cancel>Cancel</button><button class="primary" data-save>Save</button></div>');
+  const input = box.querySelector('.edit-input');
+  input.focus(); input.setSelectionRange(input.value.length, input.value.length);
+  const save = async () => {
+    try {
+      const r = await api.setProfile(S.chatId, { [field]: input.value });
+      S.chat.contactName = r.contactName || undefined;
+      S.chat.bio = r.bio || undefined;
+      openInfo();
+      if (field === 'contactName') renderWindow();
+    } catch (err) { toast(err.message); }
+  };
+  box.querySelector('[data-save]').onclick = save;
+  box.querySelector('[data-cancel]').onclick = () => openInfo();
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.stopPropagation(); openInfo(); }
+    if (e.key === 'Enter' && (!multi || e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); }
+  });
+}
 
 // all photos and videos, newest first, in the contact panel (WhatsApp's "Media" tab)
 function openGallery() {

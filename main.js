@@ -59,6 +59,7 @@ handle('chats:get', id => {
 handle('chats:rename', (id, title) => {
   const c = store.readChat(id); c.title = title; store.writeChat(id, c); return true;
 });
+handle('chats:setProfile', (id, fields) => store.setProfile(id, fields));
 handle('chats:setAvatar', async id => {
   const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp'] }] });
   return r.canceled ? null : store.setAvatar(id, r.filePaths[0]);
