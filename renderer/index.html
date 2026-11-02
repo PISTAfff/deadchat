@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' file: data: blob:; media-src 'self' file: blob:; font-src 'self'; connect-src 'none'; form-action 'none'">
+        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' file: data: blob:; media-src 'self' file: blob:; font-src 'self'; connect-src 'none'; worker-src 'self'; form-action 'none'">
   <title>DeadChat</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -32,6 +33,7 @@
 
       <section id="chat-view" hidden>
         <header class="chat-head">
+          <button class="icon-btn back-btn" id="chat-back" title="Back"><svg viewBox="0 0 24 24"><path d="M19 12H5m6-6l-6 6 6 6" /></svg></button>
           <div class="avatar" id="chat-avatar"></div>
           <div class="chat-titles">
             <div class="chat-title" id="chat-title"></div>
@@ -52,6 +54,7 @@
             <button data-act="me">Switch which side is me</button>
             <button data-act="avatar">Set profile photo…</button>
             <button data-act="rename">Rename</button>
+            <button data-act="date" class="mobile-only">Go to a date…</button>
             <button data-act="first">Go to the first message</button>
             <button data-act="remove" class="danger">Remove from DeadChat</button>
           </div>
@@ -90,12 +93,26 @@
   <div id="lightbox" class="lightbox" hidden>
     <div class="lb-bar">
       <div class="lb-who"><div class="avatar" id="lb-avatar"></div><div><div class="lb-name" id="lb-name"></div><div class="lb-sub" id="lb-sub"></div></div></div>
+      <div class="lb-actions">
+      <button class="icon-btn" id="lb-goto" title="Go to message"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z" /><path d="M9 10h6m-3-3v6" /></svg></button>
       <button class="icon-btn" id="lb-close" title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+      </div>
     </div>
-    <div class="lb-stage"><img id="lightbox-img" alt=""></div>
+    <div class="lb-stage">
+      <button class="lb-nav prev" id="lb-prev" title="Previous (←)"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" /></svg></button>
+      <img id="lightbox-img" alt="">
+      <video id="lightbox-video" controls hidden></video>
+      <button class="lb-nav next" id="lb-next" title="Next (→)"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg></button>
+    </div>
+    <div class="lb-caption" id="lb-caption" dir="auto"></div>
+    <div class="lb-strip" id="lb-strip"></div>
   </div>
   <div id="toast" class="toast" hidden></div>
 
+  <script src="shared/parser.js"></script>
+  <script src="shared/core.js"></script>
+  <script src="vendor/fflate.js"></script>
+  <script src="web-api.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

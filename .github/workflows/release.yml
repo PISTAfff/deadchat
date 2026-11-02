@@ -73,8 +73,58 @@ jobs:
           files=(dist/*.exe dist/*.dmg dist/*.AppImage dist/*.deb)
           gh release upload "${{ needs.draft.outputs.tag }}" "${files[@]}" --clobber
 
+  android:
+    needs: draft
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+
+      - run: npm run android
+
+      # Signs with the project's release key when the repo has it as secrets; otherwise with a
+      # throwaway debug key (installable, but it can't update an APK signed with the release key).
+      - name: Build the APK
+        working-directory: android
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          DEADCHAT_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          DEADCHAT_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          DEADCHAT_KEY_ALIAS: deadchat
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            export DEADCHAT_KEYSTORE="$RUNNER_TEMP/release.jks"
+          fi
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          v=$(node -p "require('../package.json').version")
+          mkdir -p ../dist && cp app/build/outputs/apk/release/app-release.apk "../dist/DeadChat-$v-android.apk"
+
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HAS_KEY: ${{ secrets.ANDROID_KEYSTORE_B64 != '' }}
+        run: |
+          if [ "$HAS_KEY" != "true" ]; then
+            echo "::warning::No ANDROID_KEYSTORE_B64 secret, so this APK is debug-signed and is not attached to the release."
+            exit 0
+          fi
+          gh release upload "${{ needs.draft.outputs.tag }}" dist/*.apk --clobber
+
   publish:
-    needs: [draft, build]
+    needs: [draft, build, android]
     runs-on: ubuntu-latest
     steps:
       - env:

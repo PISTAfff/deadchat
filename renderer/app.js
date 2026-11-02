@@ -60,7 +60,11 @@ function showView(v) {
 
 // ================= chat =================
 
+const isPhone = () => matchMedia('(max-width: 768px)').matches;
+function backToList() { stopAudio(); closeInfo(); document.body.classList.remove('chat-open'); }
+
 async function openChat(id) {
+  document.body.classList.add('chat-open');
   stopAudio();
   closeInfo();
   S.chatId = id;
@@ -424,31 +428,116 @@ $('#messages').addEventListener('click', e => {
     }
     return;
   }
-  if (t.matches('.media-img')) {
-    const m = S.chat.messages[+t.closest('[data-i]').dataset.i];
-    openViewer(t.src, { name: m.s === S.chat.me ? 'You' : otherName(), sub: `${fmtDate(m.t)} at ${fmtTime(m.t)}`, avatar: m.s === S.chat.me ? null : S.chat.avatarUrl });
-    return;
-  }
+  if (t.matches('.media-img')) { openMedia(+t.closest('[data-i]').dataset.i); return; }
   const doc = t.closest('[data-open]');
   if (doc) { api.openMedia(S.chatId, doc.dataset.open).catch(err => toast(err.message)); return; }
   const a = t.closest('a[data-href]');
   if (a) { api.openLink(a.dataset.href); }
 });
 $('#messages').addEventListener('scroll', onScroll, { passive: true });
-$('#lightbox').onclick = e => { if (!e.target.closest('#lightbox-img, .lb-bar')) closeViewer(); };
+$('#lightbox').onclick = e => { if (!e.target.closest('#lightbox-img, #lightbox-video, .lb-bar, .lb-nav, .lb-strip')) closeViewer(); };
 // ---------- contact info + photo viewer (like WhatsApp) ----------
 function otherIndex() { return S.chat.participants.findIndex((_, k) => k !== S.chat.me); }
 function otherName() { return S.chat.participants[otherIndex()]?.name || S.chat.title; }
 
+// Single photos (profile pictures) open on their own; chat media opens as a gallery you can move through.
+const V = { list: null, pos: 0 };
+
 function openViewer(src, { name, sub, avatar, pfp } = {}) {
-  $('#lightbox-img').src = src;
-  $('#lightbox-img').classList.toggle('pfp', !!pfp);
+  V.list = null;
+  $('#lightbox').classList.remove('gallery');
+  showStill(src, !!pfp);
+  setViewerBar(name, sub, avatar);
+  $('#lb-caption').textContent = '';
+  $('#lb-strip').innerHTML = '';
+  $('#lightbox').hidden = false;
+}
+function closeViewer() {
+  $('#lightbox').hidden = true;
+  $('#lightbox-img').removeAttribute('src');
+  const v = $('#lightbox-video'); v.pause(); v.removeAttribute('src'); v.hidden = true;
+  V.list = null;
+}
+function setViewerBar(name, sub, avatar) {
   $('#lb-name').textContent = name || '';
   $('#lb-sub').textContent = sub || '';
   $('#lb-avatar').innerHTML = avatar ? `<img src="${esc(avatar)}" alt="">` : esc((name || '?').charAt(0));
-  $('#lightbox').hidden = false;
 }
-function closeViewer() { $('#lightbox').hidden = true; $('#lightbox-img').removeAttribute('src'); }
+function showStill(src, pfp) {
+  const v = $('#lightbox-video'); v.pause(); v.removeAttribute('src'); v.hidden = true;
+  const img = $('#lightbox-img');
+  img.hidden = false; img.src = src; img.classList.toggle('pfp', pfp);
+}
+
+// every photo and video in the chat that has its file, oldest first
+function chatMedia() {
+  const out = [];
+  S.chat.messages.forEach((m, i) => { if (m.a && !m.a.missing && (m.a.k === 'image' || m.a.k === 'video')) out.push(i); });
+  return out;
+}
+
+function openMedia(index) {
+  V.list = chatMedia();
+  V.pos = Math.max(0, V.list.indexOf(index));
+  $('#lightbox').classList.add('gallery');
+  $('#lightbox').hidden = false;
+  showMediaAt(V.pos);
+}
+
+function showMediaAt(pos) {
+  if (!V.list || !V.list.length) return;
+  V.pos = Math.max(0, Math.min(V.list.length - 1, pos));
+  const i = V.list[V.pos], m = S.chat.messages[i], url = mediaUrl(m.a.f);
+  const mine = m.s === S.chat.me;
+  setViewerBar(mine ? 'You' : otherName(), `${fmtDate(m.t)} at ${fmtTime(m.t)}`, mine ? null : S.chat.avatarUrl);
+  if (m.a.k === 'video') {
+    $('#lightbox-img').hidden = true; $('#lightbox-img').removeAttribute('src');
+    const v = $('#lightbox-video'); v.hidden = false; v.src = url; v.play().catch(() => {});
+  } else showStill(url, false);
+  $('#lb-caption').textContent = m.x || '';
+  $('#lb-prev').hidden = V.pos === 0;
+  $('#lb-next').hidden = V.pos === V.list.length - 1;
+  renderStrip();
+}
+
+// thumbnails along the bottom, like WhatsApp
+function renderStrip() {
+  const strip = $('#lb-strip');
+  const from = Math.max(0, V.pos - 25), to = Math.min(V.list.length, V.pos + 26);
+  strip.innerHTML = V.list.slice(from, to).map((i, k) => {
+    const m = S.chat.messages[i], p = from + k;
+    return m.a.k === 'video'
+      ? `<button class="thumb vid${p === V.pos ? ' on' : ''}" data-p="${p}"><video src="${mediaUrl(m.a.f)}#t=0.1" preload="metadata" muted></video></button>`
+      : `<button class="thumb${p === V.pos ? ' on' : ''}" data-p="${p}"><img src="${mediaUrl(m.a.f)}" loading="lazy" alt=""></button>`;
+  }).join('');
+  strip.querySelector('.on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+}
+
+$('#lb-prev').onclick = () => showMediaAt(V.pos - 1);
+$('#lb-next').onclick = () => showMediaAt(V.pos + 1);
+$('#lb-strip').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (b) showMediaAt(+b.dataset.p); });
+$('#lb-goto').onclick = () => {
+  if (!V.list) return;
+  const i = V.list[V.pos];
+  closeViewer(); closeInfo();
+  jumpTo(i);
+};
+document.addEventListener('keydown', e => {
+  if ($('#lightbox').hidden || !V.list) return;
+  if (e.key === 'ArrowLeft') { e.preventDefault(); showMediaAt(V.pos - 1); }
+  if (e.key === 'ArrowRight') { e.preventDefault(); showMediaAt(V.pos + 1); }
+});
+// swipe between media on touch screens
+(() => {
+  let x0 = null;
+  const stage = document.querySelector('.lb-stage');
+  stage.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+  stage.addEventListener('touchend', e => {
+    if (x0 == null || !V.list) return;
+    const dx = e.changedTouches[0].clientX - x0; x0 = null;
+    if (Math.abs(dx) > 50) showMediaAt(V.pos + (dx < 0 ? 1 : -1));
+  });
+})();
 
 function openInfo() {
   if (!S.chat) return;
@@ -469,7 +558,7 @@ function openInfo() {
       <div class="info-sub">${esc(c.title)}</div>
     </div>
     <div class="info-card">
-      <div class="info-row"><span>Media, links and docs</span><span class="muted">${total.toLocaleString()}</span></div>
+      <button class="info-row info-link" id="info-all"><span>Media, links and docs</span><span class="muted">${total.toLocaleString()} ›</span></button>
       <div class="info-grid">${media.map(k => `<img src="${mediaUrl(msgs[k].a.f)}" data-k="${k}" loading="lazy" alt="">`).join('')}</div>
     </div>
     <div class="info-card info-stats">
@@ -491,12 +580,30 @@ $('#info-body').addEventListener('click', e => {
   if (e.target.closest('#info-photo') && S.chat.avatarUrl) {
     openViewer(S.chat.avatarUrl, { name: otherName(), sub: 'Profile photo', avatar: S.chat.avatarUrl, pfp: true });
   }
-  const img = e.target.closest('img[data-k]');
-  if (img) {
-    const m = S.chat.messages[+img.dataset.k];
-    openViewer(img.src, { name: m.s === S.chat.me ? 'You' : otherName(), sub: `${fmtDate(m.t)} at ${fmtTime(m.t)}`, avatar: m.s === S.chat.me ? null : S.chat.avatarUrl });
-  }
+  const img = e.target.closest('[data-k]');
+  if (img) { openMedia(+img.dataset.k); return; }
+  if (e.target.closest('#info-all')) openGallery();
+  if (e.target.closest('#gallery-back')) openInfo();
 });
+
+// all photos and videos, newest first, in the contact panel (WhatsApp's "Media" tab)
+function openGallery() {
+  const list = chatMedia().reverse();
+  const byMonth = [];
+  for (const i of list) {
+    const d = new Date(S.chat.messages[i].t), key = `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+    if (!byMonth.length || byMonth[byMonth.length - 1].key !== key) byMonth.push({ key, items: [] });
+    byMonth[byMonth.length - 1].items.push(i);
+  }
+  $('#info-body').innerHTML = `<div class="info-card gallery-head"><button class="icon-btn" id="gallery-back" title="Back"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" /></svg></button><span>Media · ${list.length.toLocaleString()}</span></div>` +
+    byMonth.map(g => `<div class="info-card"><div class="info-row"><span>${g.key}</span></div><div class="info-grid">${g.items.map(i => {
+      const m = S.chat.messages[i];
+      return m.a.k === 'video'
+        ? `<div class="gthumb vid" data-k="${i}"><video src="${mediaUrl(m.a.f)}#t=0.1" preload="metadata" muted></video></div>`
+        : `<img src="${mediaUrl(m.a.f)}" data-k="${i}" loading="lazy" alt="">`;
+    }).join('')}</div></div>`).join('');
+  $('#info-body').scrollTop = 0;
+}
 // voice-note avatars open the photo too
 document.addEventListener('click', e => {
   const img = e.target.closest('.v-avatar img');
@@ -567,6 +674,7 @@ $('#chat-menu').onclick = async e => {
   if (act === 'add') startImport(S.chatId);
   if (act === 'export') startExport();
   if (act === 'first') jumpTo(0, false);
+  if (act === 'date') { const d = $('#jump-date'); try { d.showPicker(); } catch { d.focus(); d.click(); } }
   if (act === 'avatar') {
     const url = await api.setAvatar(S.chatId);
     if (url) { await refreshChats(); openChat(S.chatId); }
@@ -584,7 +692,7 @@ $('#chat-menu').onclick = async e => {
     $('#me-ok').onclick = async () => { const v = document.querySelector('input[name=me]:checked'); if (!v) return; await api.setMe(S.chatId, +v.value); closeModal(); openChat(S.chatId); };
   }
   if (act === 'remove') {
-    if (await api.deleteChat(S.chatId)) { stopAudio(); S.chatId = null; S.chat = null; await refreshChats(); showView('empty'); }
+    if (await api.deleteChat(S.chatId)) { backToList(); S.chatId = null; S.chat = null; await refreshChats(); showView('empty'); }
   }
 };
 
@@ -735,5 +843,15 @@ document.addEventListener('keydown', e => {
 
 (async () => {
   await refreshChats();
-  if (S.chats.length) openChat(S.chats[0].id);
+  if (S.chats.length && !isPhone()) openChat(S.chats[0].id);
 })();
+
+// back arrow (phones) and the Android back button: step back one screen at a time
+$('#chat-back').onclick = backToList;
+window.addEventListener('dc-back', () => {
+  if (!$('#lightbox').hidden) closeViewer();
+  else if (!$('#modal').hidden) closeModal();
+  else if (!$('#info-panel').hidden) closeInfo();
+  else if (isPhone() && document.body.classList.contains('chat-open')) backToList();
+  else window.Capacitor?.Plugins?.App?.exitApp();
+});

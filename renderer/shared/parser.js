@@ -111,4 +111,6 @@ function parseChat(text) {
   return { senders, messages: out };
 }
 
-module.exports = { parseChat, kindOf };
+// Works in Node (require) and in the browser (window.DeadChat).
+if (typeof module !== 'undefined' && module.exports) module.exports = { parseChat, kindOf };
+else (globalThis.DeadChat = globalThis.DeadChat || {}, Object.assign(globalThis.DeadChat, { parseChat, kindOf }));

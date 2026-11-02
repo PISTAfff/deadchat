@@ -16,32 +16,35 @@ DeadChat opens the chat exports WhatsApp makes ("Export chat") and lets you scro
   - voice notes with a waveform, 1× / 1.5× / 2× speed, and automatic play of the next one;
   - photos and videos, a photo viewer, and a contact-info panel with a profile photo.
 - **Find things:** search the whole chat with `Ctrl/⌘ + F`, or jump to any date.
-- **Write what you never sent.** Messages you type stay on your computer with a single grey tick. They are never delivered.
+- **Write what you never sent.** Messages you type stay on your device with a single grey tick. They are never delivered.
 - **Export it again** as a WhatsApp-style `.zip`, with or without media and your undelivered messages.
 
 ## Private by design
 
 - No accounts, no servers, no analytics.
-- Every network request is blocked inside the app.
+- Every network request is blocked inside the app. The Android app doesn't even ask for internet permission.
 - Imported chats are copied into the app's own folder. Your original files are only read, never changed.
   - Windows: `%APPDATA%\DeadChat`
   - macOS: `~/Library/Application Support/DeadChat`
   - Linux: `~/.config/DeadChat`
+  - Android: the app's private storage
 - Removing a chat in DeadChat deletes only that copy.
 
 ## Download
 
-Get the latest installer from **[Releases](https://github.com/PISTAfff/deadchat/releases/latest)**.
+Get the latest version from **[Releases](https://github.com/PISTAfff/deadchat/releases/latest)**.
 
 | System | File |
 |---|---|
 | Windows 10/11 | `DeadChat-…-windows-setup.exe` |
 | macOS (Apple silicon and Intel) | `DeadChat-…-mac-universal.dmg` |
 | Linux | `.AppImage` or `.deb` |
+| Android 7+ | `DeadChat-…-android.apk` |
 
 The builds aren't code-signed yet:
 - **Windows:** SmartScreen may warn you. Choose **More info**, then **Run anyway**.
 - **macOS:** if it says the app "is damaged", run `xattr -cr /Applications/DeadChat.app` once.
+- **Android:** open the `.apk` on your phone and allow installing from that source when Android asks.
 
 ## How to export a chat from WhatsApp
 
@@ -56,7 +59,20 @@ npm test           # parser, merge and export tests
 npm run dist       # installers for the current system, in dist/
 ```
 
-Pushing a tag like `v1.0.1` runs the Release workflow, which builds Windows, macOS and Linux installers and publishes them as one GitHub Release.
+### Android
+
+The phone app is the same interface, packaged with [Capacitor](https://capacitorjs.com). It has its own storage layer (`renderer/web-api.js`, using IndexedDB and a service worker for media) and a one-screen-at-a-time layout.
+
+```bash
+npm run android                      # copy the app into android/ and sync
+cd android && ./gradlew assembleRelease
+```
+
+You need JDK 17+ and the Android SDK. Release signing reads `DEADCHAT_KEYSTORE`, `DEADCHAT_KEYSTORE_PASSWORD`, `DEADCHAT_KEY_ALIAS` and `DEADCHAT_KEY_PASSWORD`. Without them, the build is debug-signed.
+
+### Releases
+
+Pushing a tag like `v1.0.1` runs the Release workflow. It builds the Windows, macOS, Linux and Android versions and publishes them as one GitHub Release. To sign the APK in CI, add `ANDROID_KEYSTORE_B64` (the keystore, base64) and `ANDROID_KEYSTORE_PASSWORD` as repository secrets.
 
 ## License
 

@@ -6,7 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const AdmZip = require('adm-zip');
-const { parseChat } = require('../src/parser');
+const { parseChat } = require('../renderer/shared/parser');
 const { Store, mergeMessages, suggestMapping } = require('../src/importer');
 
 const ANDROID = [

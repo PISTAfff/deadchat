@@ -231,3 +231,69 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .lb-sub { font-size: 12.5px; color: var(--muted); }
 .lb-stage { flex: 1; display: grid; place-items: center; padding: 0 16px 48px; min-height: 0; }
 
+
+/* ---------- phones (WhatsApp for Android layout) ---------- */
+.back-btn, .mobile-only { display: none !important; }
+.web #pick-folder { display: none; }
+@media (max-width: 768px) {
+  #app { grid-template-columns: 1fr; }
+  #sidebar { grid-column: 1; grid-row: 1; }
+  #main { grid-column: 1; grid-row: 1; display: none; }
+  body.chat-open #main { display: flex; }
+  body.chat-open #sidebar { display: none; }
+  .side-head { padding: calc(14px + env(safe-area-inset-top)) 16px 12px; background: var(--panel); }
+  .brand img { width: 28px; height: 28px; }
+  .row { padding: 12px 16px; border-bottom: 0; }
+  .row .avatar { width: 50px; height: 50px; }
+  .icon-btn { width: 44px; height: 44px; }
+  .back-btn { display: grid !important; margin-left: -8px; }
+  .mobile-only { display: block !important; }
+  .chat-head { padding: env(safe-area-inset-top) 4px 0 8px; height: calc(60px + env(safe-area-inset-top)); gap: 6px; }
+  #jump-date { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; padding: 0; border: 0; }
+  .menu { right: 6px; top: calc(52px + env(safe-area-inset-top)); min-width: 230px; }
+  .menu button { padding: 13px 20px; }
+  .messages { padding: 8px 10px 14px; }
+  .bubble { max-width: 85%; }
+  .voice { width: 250px; }
+  .composer { padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); }
+  .composer textarea { border-radius: 22px; padding: 11px 16px; }
+  .send { width: 46px; height: 46px; background: var(--accent); color: var(--bone); }
+  .send:disabled { opacity: .55; }
+  .info-panel { position: fixed; inset: 0; width: 100%; min-width: 0; z-index: 30; height: 100%; }
+  .info-head { padding-top: env(safe-area-inset-top); height: calc(60px + env(safe-area-inset-top)); }
+  .lb-bar { padding-top: env(safe-area-inset-top); height: calc(62px + env(safe-area-inset-top)); }
+  .modal-card { padding: 18px; }
+  .modal-actions { flex-wrap: wrap; }
+  .to-bottom { right: 14px; bottom: calc(74px + env(safe-area-inset-bottom)); }
+  .empty { display: none; }
+}
+
+/* media gallery viewer */
+.lb-actions { display: flex; gap: 4px; }
+#lb-goto { display: none; }
+.lightbox.gallery #lb-goto { display: grid; }
+.lb-stage { position: relative; }
+#lightbox-video { max-width: 92vw; max-height: calc(100vh - 220px); background: #000; }
+.lightbox.gallery img#lightbox-img { max-height: calc(100vh - 220px); }
+.lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 50%; background: #ffffff1a; color: #e9edef; display: none; place-items: center; z-index: 2; }
+.lightbox.gallery .lb-nav:not([hidden]) { display: grid; }
+.lb-nav:hover { background: #ffffff2e; }
+.lb-nav.prev { left: 18px; }
+.lb-nav.next { right: 18px; }
+.lb-caption { text-align: center; color: #e9edef; padding: 0 24px 8px; font-size: 14px; white-space: pre-wrap; min-height: 0; }
+.lb-strip { display: none; gap: 6px; overflow-x: auto; padding: 10px 16px 16px; justify-content: safe center; flex: none; }
+.lightbox.gallery .lb-strip { display: flex; }
+.lb-strip::-webkit-scrollbar { height: 4px; }
+.lb-strip::-webkit-scrollbar-thumb { background: #ffffff22; }
+.thumb { width: 54px; height: 54px; flex: none; border-radius: 6px; overflow: hidden; opacity: .55; padding: 0; position: relative; }
+.thumb.on { opacity: 1; outline: 2px solid #e9edef; outline-offset: 1px; }
+.thumb img, .thumb video, .gthumb video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.thumb.vid::after, .gthumb.vid::after { content: "▶"; position: absolute; left: 4px; bottom: 2px; font-size: 11px; color: #fff; text-shadow: 0 0 3px #000; }
+.gthumb { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; cursor: pointer; background: #0003; }
+.info-link { width: 100%; cursor: pointer; }
+.info-link:hover span:first-child { color: var(--text); }
+.gallery-head { display: flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 15px; position: sticky; top: 0; z-index: 2; }
+@media (max-width: 768px) {
+  .lb-nav { display: none !important; }
+  .thumb { width: 46px; height: 46px; }
+}

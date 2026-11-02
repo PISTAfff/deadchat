@@ -15,14 +15,23 @@
     "start": "electron .",
     "test": "node --test test/deadchat.test.js",
     "icon": "electron brand/render-icon.js",
-    "dist": "electron-builder --publish never"
+    "dist": "electron-builder --publish never",
+    "www": "node scripts/build-www.js",
+    "android": "node scripts/build-www.js && npx cap sync android"
   },
   "dependencies": {
     "adm-zip": "0.5.16"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/share": "^8.0.3",
     "electron": "33.2.1",
-    "electron-builder": "25.1.8"
+    "electron-builder": "25.1.8",
+    "fflate": "^0.8.2"
   },
   "build": {
     "appId": "io.github.pistafff.deadchat",

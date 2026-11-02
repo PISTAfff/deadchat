@@ -9,3 +9,6 @@ library/
 *.jks
 *.keystore
 android/app/release/
+.claude/
+www/
+build/mark.png

@@ -1,0 +1,9 @@
+{
+  "appId": "io.github.pistafff.deadchat",
+  "appName": "DeadChat",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#0b141a",
+    "allowMixedContent": false
+  }
+}
