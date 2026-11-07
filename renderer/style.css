@@ -531,3 +531,15 @@ button:active:not(:disabled) { transform: scale(.93); }
 /* bars span the whole waveform, so the dot ends exactly on the last bar */
 .wave { justify-content: space-between; gap: 0; }
 .wave i { flex: 0 0 3px; max-width: 3px; min-width: 3px; }
+
+/* starred messages: a star by the time, and their list */
+.msg.starred .meta::before { content: "\2605"; margin-right: 4px; color: #ffd279; }
+.starred-list { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow: auto; margin: 4px -6px 0; }
+.starred-row { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 10px 12px; border-radius: 10px; background: #ffffff0d; }
+.starred-row:hover { background: #ffffff1a; }
+.starred-top { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+.starred-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* zooming a photo in the viewer */
+#lightbox-img { touch-action: none; user-select: none; -webkit-user-drag: none; transform-origin: center; }
+#lightbox-img.zoomed { cursor: grab; }

@@ -1,6 +1,8 @@
-**What's new in 1.2.1**
+**What's new in 1.3**
 
-- Android: playing a voice note no longer closes the app.
+- Star messages: long-press (or right-click) a message and choose Star. Find them all under Starred messages, in the chat menu or the contact info, and tap one to jump to it in the chat.
+- Zoom into photos and profile pictures: pinch, double-tap or use the mouse wheel, then drag to look around.
+- Android: playing a voice note no longer closes the app (1.2.1).
 
 **New in 1.2**
 

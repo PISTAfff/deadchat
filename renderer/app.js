@@ -112,6 +112,56 @@ function avatarHtml(url, title, id) {
 
 function senderClass(m) { return m.s === S.chat.me ? 'out' : 'in'; }
 
+// ---------- starred messages: kept per chat on this device ----------
+// A message is known by its time, sender and content (imported ones have no id of their own).
+function msgKey(m) {
+  if (m.id) return 'u:' + m.id;
+  const s = (m.x || '') + '|' + ((m.a && m.a.f) || '');
+  let h = 0;
+  for (let k = 0; k < s.length; k++) h = (h * 31 + s.charCodeAt(k)) | 0;
+  return m.t + ':' + m.s + ':' + h;
+}
+let stars = new Set(), starsFor = null;
+function starSet() {
+  if (starsFor !== S.chatId) { stars = new Set(store.get('stars:' + S.chatId, [])); starsFor = S.chatId; }
+  return stars;
+}
+const isStarred = m => starSet().has(msgKey(m));
+function toggleStar(i) {
+  const set = starSet(), k = msgKey(S.chat.messages[i]), on = !set.has(k);
+  if (on) set.add(k); else set.delete(k);
+  store.set('stars:' + S.chatId, [...set]);
+  $('#messages [data-i="' + i + '"]')?.classList.toggle('starred', on);
+  toast(on ? 'Starred' : 'Unstarred');
+}
+function msgPreview(m) {
+  if (m.x) return m.x;
+  if (m.a) return { audio: 'Voice note', image: 'Photo', video: 'Video', sticker: 'Sticker' }[m.a.k] || m.a.f;
+  return 'Message';
+}
+function openStarred() {
+  const list = [];
+  S.chat.messages.forEach((m, i) => { if (!m.sys && isStarred(m)) list.push(i); });
+  list.reverse();
+  const who = m => (m.s === S.chat.me ? 'You' : (S.chat.participants[m.s] && S.chat.participants[m.s].name) || '?');
+  const rows = list.map(i => {
+    const m = S.chat.messages[i];
+    return '<button class="starred-row" data-go="' + i + '"><span class="starred-top"><b dir="auto">' + esc(who(m)) + '</b><span class="muted">' +
+      fmtDate(m.t) + ', ' + fmtTime(m.t) + '</span></span><span class="starred-text" dir="auto">' + esc(msgPreview(m)) + '</span></button>';
+  }).join('');
+  modal('<h2>Starred messages</h2>' + (list.length
+    ? '<div class="starred-list">' + rows + '</div>'
+    : '<p class="muted">Nothing starred yet. Long-press a message (or right-click it) and choose Star.</p>') +
+    '<div class="modal-actions"><button class="ghost" data-close>Close</button></div>');
+  const box = document.querySelector('.starred-list');
+  if (box) box.addEventListener('click', e => {
+    const b = e.target.closest('[data-go]');
+    if (!b) return;
+    closeModal(); closeInfo();
+    jumpTo(+b.dataset.go);
+  });
+}
+
 function linkify(text) {
   let html = esc(text);
   html = html.replace(/\bhttps?:\/\/[^\s<]+/g, u => `<a data-href="${u}">${u}</a>`);
@@ -138,6 +188,7 @@ function renderMessage(m, i, prev) {
   const row = el('div', `msg ${senderClass(m)}${first ? ' first' : ''}${sticker ? ' sticker-wrap' : ''}`);
   row.dataset.i = i;
   if (m.u) row.dataset.uid = m.id;
+  if (isStarred(m)) row.classList.add('starred');
   const b = el('div', 'bubble');
   const tick = m.u ? `<span class="tick" title="Not delivered — and it never will be">${TICK}</span>` : '';
   const meta = `<span class="meta">${m.e ? 'Edited · ' : ''}${fmtTime(m.t)}${tick}</span>`;
@@ -721,6 +772,7 @@ function openViewer(src, { name, sub, avatar, pfp } = {}) {
 function closeViewer() {
   $('#lightbox').hidden = true;
   $('#lightbox-img').removeAttribute('src');
+  zReset();
   const v = $('#lightbox-video'); v.pause(); v.removeAttribute('src'); v.hidden = true;
   V.list = null;
 }
@@ -733,7 +785,76 @@ function showStill(src, pfp) {
   const v = $('#lightbox-video'); v.pause(); v.removeAttribute('src'); v.hidden = true;
   const img = $('#lightbox-img');
   img.hidden = false; img.src = src; img.classList.toggle('pfp', pfp);
+  zReset();
 }
+
+// ---------- zoom in the viewer: pinch, double-tap (double-click) or the wheel, then drag about ----------
+const Z = { s: 1, x: 0, y: 0, pts: new Map(), pinch: null, pan: null, tap: 0, tapAt: null };
+const zImg = $('#lightbox-img');
+function zApply(anim) {
+  zImg.style.transition = anim ? 'transform .22s cubic-bezier(.2,.9,.3,1)' : 'none';
+  zImg.style.transform = Z.s === 1 ? '' : 'translate(' + Z.x + 'px,' + Z.y + 'px) scale(' + Z.s + ')';
+  zImg.classList.toggle('zoomed', Z.s > 1);
+}
+function zReset() { Z.s = 1; Z.x = 0; Z.y = 0; Z.pts.clear(); Z.pinch = Z.pan = null; zApply(false); }
+// keep the picture covering what it can: no dragging it off into the dark
+function zClamp() {
+  const w = zImg.offsetWidth, h = zImg.offsetHeight;
+  const mx = Math.max(0, (w * Z.s - innerWidth) / 2 + 16), my = Math.max(0, (h * Z.s - innerHeight) / 2 + 16);
+  const ex = (w * (Z.s - 1)) / 2, ey = (h * (Z.s - 1)) / 2;
+  Z.x = Math.max(-Math.max(mx, ex), Math.min(Math.max(mx, ex), Z.x));
+  Z.y = Math.max(-Math.max(my, ey), Math.min(Math.max(my, ey), Z.y));
+}
+// zoom to `s` keeping the screen point (cx, cy) where it is
+function zTo(s, cx, cy, anim) {
+  s = Math.max(1, Math.min(5, s));
+  const r = zImg.getBoundingClientRect();
+  const ox = (r.left + r.right) / 2 - Z.x, oy = (r.top + r.bottom) / 2 - Z.y; // the untouched centre
+  const ux = cx - ox, uy = cy - oy;
+  Z.x = ux - (ux - Z.x) * (s / Z.s);
+  Z.y = uy - (uy - Z.y) * (s / Z.s);
+  Z.s = s;
+  if (s === 1) { Z.x = 0; Z.y = 0; }
+  zClamp();
+  zApply(anim);
+}
+zImg.addEventListener('pointerdown', e => {
+  try { zImg.setPointerCapture(e.pointerId); } catch { /* a pointer the browser no longer has */ }
+  Z.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (Z.pts.size === 2) {
+    const [a, b] = [...Z.pts.values()];
+    Z.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), s: Z.s };
+    Z.pan = null;
+  } else if (Z.pts.size === 1) {
+    Z.pan = { x: e.clientX, y: e.clientY, zx: Z.x, zy: Z.y };
+    // a second tap close by and soon: zoom in there, or back out
+    if (e.pointerType !== 'mouse' && Date.now() - Z.tap < 300 && Z.tapAt && Math.hypot(e.clientX - Z.tapAt.x, e.clientY - Z.tapAt.y) < 30) {
+      zTo(Z.s > 1 ? 1 : 2.5, e.clientX, e.clientY, true);
+      Z.tap = 0;
+    } else { Z.tap = Date.now(); Z.tapAt = { x: e.clientX, y: e.clientY }; }
+  }
+});
+zImg.addEventListener('pointermove', e => {
+  if (!Z.pts.has(e.pointerId)) return;
+  Z.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (Z.pinch && Z.pts.size >= 2) {
+    const [a, b] = [...Z.pts.values()];
+    zTo(Z.pinch.s * Math.hypot(a.x - b.x, a.y - b.y) / (Z.pinch.d || 1), (a.x + b.x) / 2, (a.y + b.y) / 2, false);
+  } else if (Z.pan && Z.s > 1) {
+    Z.x = Z.pan.zx + e.clientX - Z.pan.x;
+    Z.y = Z.pan.zy + e.clientY - Z.pan.y;
+    zClamp();
+    zApply(false);
+  }
+});
+for (const t of ['pointerup', 'pointercancel']) zImg.addEventListener(t, e => {
+  Z.pts.delete(e.pointerId);
+  if (Z.pts.size < 2) Z.pinch = null;
+  if (!Z.pts.size) { Z.pan = null; if (Z.s < 1.05) zTo(1, 0, 0, true); }
+});
+zImg.addEventListener('dblclick', e => zTo(Z.s > 1 ? 1 : 2.5, e.clientX, e.clientY, true));
+zImg.addEventListener('wheel', e => { e.preventDefault(); zTo(Z.s * Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY, false); }, { passive: false });
+
 
 // every photo and video in the chat that has its file, oldest first
 function chatMedia() {
@@ -797,9 +918,9 @@ document.addEventListener('keydown', e => {
 (() => {
   let x0 = null;
   const stage = document.querySelector('.lb-stage');
-  stage.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+  stage.addEventListener('touchstart', e => { x0 = e.touches.length === 1 && Z.s === 1 ? e.touches[0].clientX : null; }, { passive: true });
   stage.addEventListener('touchend', e => {
-    if (x0 == null || !V.list) return;
+    if (x0 == null || !V.list || Z.s > 1 || e.touches.length) { if (!e.touches.length) x0 = null; return; }
     const dx = e.changedTouches[0].clientX - x0; x0 = null;
     if (Math.abs(dx) > 50) showMediaAt(V.pos + (dx < 0 ? 1 : -1));
   });
@@ -838,6 +959,7 @@ function openInfo() {
     </div>
     <div class="info-card">
       <button class="info-row info-link" id="info-all"><span>Media, links and docs</span><span class="muted">${total.toLocaleString()} ›</span></button>
+      <button class="info-row info-link" id="info-starred"><span>Starred messages</span><span class="muted">${msgs.filter(m => !m.sys && isStarred(m)).length.toLocaleString()} ›</span></button>
       <div class="info-grid">${media.map(k => `<img src="${mediaUrl(msgs[k].a.f)}" data-k="${k}" loading="lazy" alt="">`).join('')}</div>
     </div>
     <div class="info-card info-stats">
@@ -865,6 +987,7 @@ $('#info-body').addEventListener('click', e => {
   const img = e.target.closest('[data-k]');
   if (img) { openMedia(+img.dataset.k); return; }
   if (e.target.closest('#info-all')) openGallery();
+  if (e.target.closest('#info-starred')) openStarred();
   if (e.target.closest('#gallery-back')) openInfo();
 });
 
@@ -998,6 +1121,7 @@ $('#chat-menu').onclick = async e => {
   if (act === 'add') startImport(S.chatId);
   if (act === 'export') startExport();
   if (act === 'first') jumpTo(0, false);
+  if (act === 'starred') openStarred();
   if (act === 'date') { const d = $('#jump-date'); try { d.showPicker(); } catch { d.focus(); d.click(); } }
   if (act === 'avatar') {
     const url = await api.setAvatar(S.chatId);
@@ -1157,18 +1281,19 @@ async function sendLocal() {
   } catch (err) { toast(err.message); }
 }
 
-// right-click an undelivered message to take it back
-$('#messages').addEventListener('contextmenu', e => {
-  const row = e.target.closest('[data-uid]');
+// a message's menu: right-click it, or long-press it on a phone. Star any message; take back one
+// written here.
+function msgMenu(row, x, y) {
   closeCtx();
-  if (!row) return;
-  e.preventDefault();
-  const menu = el('div', 'ctx', '<button data-copy>Copy text</button><button class="danger" data-del>Delete this message</button>');
-  menu.style.left = Math.min(e.clientX, innerWidth - 220) + 'px'; menu.style.top = Math.min(e.clientY, innerHeight - 100) + 'px';
+  const i = +row.dataset.i, m = S.chat.messages[i];
+  const menu = el('div', 'ctx', '<button data-star>' + (isStarred(m) ? 'Unstar' : 'Star') + '</button>' +
+    (m.x ? '<button data-copy>Copy text</button>' : '') + (row.dataset.uid ? '<button class="danger" data-del>Delete this message</button>' : ''));
   document.body.append(menu);
-  const i = +row.dataset.i;
+  menu.style.left = Math.max(8, Math.min(x, innerWidth - menu.offsetWidth - 8)) + 'px';
+  menu.style.top = Math.max(8, Math.min(y, innerHeight - menu.offsetHeight - 8)) + 'px';
   menu.onclick = async ev => {
-    if (ev.target.closest('[data-copy]')) api.copyText(S.chat.messages[i].x || '');
+    if (ev.target.closest('[data-star]')) toggleStar(i);
+    if (ev.target.closest('[data-copy]')) api.copyText(m.x || '');
     if (ev.target.closest('[data-del]')) {
       if (playingIdx === i) stopAudio();
       else if (playingIdx != null && playingIdx > i) playingIdx--;
@@ -1180,7 +1305,27 @@ $('#messages').addEventListener('contextmenu', e => {
     }
     closeCtx();
   };
+}
+$('#messages').addEventListener('contextmenu', e => {
+  const row = e.target.closest('.msg[data-i]');
+  closeCtx();
+  if (!row || e.target.closest('a, input, textarea')) return;
+  e.preventDefault();
+  if (Date.now() - pressedAt < 800) return; // the long press already opened it
+  msgMenu(row, e.clientX, e.clientY);
 });
+let pressTimer = 0, pressedAt = 0, pressAt = null;
+$('#messages').addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse') return;
+  const row = e.target.closest('.msg[data-i]');
+  if (!row || e.target.closest('.wave, button, a, video')) return;
+  pressAt = { x: e.clientX, y: e.clientY };
+  clearTimeout(pressTimer);
+  pressTimer = setTimeout(() => { pressedAt = Date.now(); try { navigator.vibrate && navigator.vibrate(12); } catch {} msgMenu(row, pressAt.x, pressAt.y); }, 480);
+});
+for (const t of ['pointerup', 'pointercancel']) $('#messages').addEventListener(t, () => clearTimeout(pressTimer));
+$('#messages').addEventListener('pointermove', e => { if (pressAt && Math.hypot(e.clientX - pressAt.x, e.clientY - pressAt.y) > 10) clearTimeout(pressTimer); });
+$('#messages').addEventListener('scroll', () => clearTimeout(pressTimer), { passive: true });
 function closeCtx() { document.querySelectorAll('.ctx').forEach(m => m.remove()); }
 document.addEventListener('click', e => { if (!e.target.closest('.ctx')) closeCtx(); });
 
