@@ -312,6 +312,14 @@ let playingIdx = null;
 let speed = store.get('speed', 1);
 const durations = new Map();
 
+// on Android, a note held to the ear plays natively through the earpiece (see EarpiecePlugin.java)
+const native = window.Capacitor?.isNativePlatform?.() && window.Capacitor.Plugins;
+const Ear = native && native.Earpiece, FS = native && native.Filesystem;
+let ear = null; // { i, pos, timer } while the playing note is at the ear
+const curTime = () => (ear ? ear.pos : player.currentTime);
+const isPaused = () => (ear ? false : player.paused);
+let scrub = null; // { i, frac, ... } while a waveform is being dragged
+
 const PLAY = '<svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg>';
 const PAUSE = '<svg viewBox="0 0 24 24"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>';
 
@@ -340,10 +348,10 @@ function voiceHtml(i, meta = '') {
   // real waveform once it has been measured; a flat line until then
   const bars = (cachedWave(m.a.f) || Array(BARS).fill(1)).map(v => `<i class="h${v}"></i>`).join('');
   return `<div class="voice${playing ? ' playing' : ''}" data-voice="${i}">
-    <button class="play" title="Play">${playing && !player.paused ? PAUSE : PLAY}</button>
+    <button class="play" title="Play">${playing && !isPaused() ? PAUSE : PLAY}</button>
     <div class="v-main">
       <div class="wave" title="Seek">${bars}<span class="dot"></span></div>
-      <div class="v-foot"><span class="v-time">${playing ? fmtDur(player.currentTime) : dur ? fmtDur(dur) : '0:00'}</span>${S.chat.messages[i].x ? '' : meta}</div>
+      <div class="v-foot"><span class="v-time">${playing ? fmtDur(curTime()) : dur ? fmtDur(dur) : '0:00'}</span>${S.chat.messages[i].x ? '' : meta}</div>
     </div>
     <div class="v-side">
       <div class="v-avatar">${m.s !== S.chat.me && S.chat.avatarUrl ? `<img src="${esc(S.chat.avatarUrl)}" alt="">` : esc(name.charAt(0).toUpperCase() || '?')}<span class="v-mic">${MIC}</span></div>
@@ -361,12 +369,14 @@ function setWave(v, frac) {
 
 function updateVoiceUI() {
   if (playingIdx == null) return;
+  updateSession();
   const v = voiceNode(playingIdx); if (!v) return;
   v.classList.add('playing');
-  v.querySelector('.play').innerHTML = player.paused ? PLAY : PAUSE;
+  v.querySelector('.play').innerHTML = isPaused() ? PLAY : PAUSE;
+  if (scrub && scrub.i === playingIdx) return;
   const dur = playingDuration();
-  if (dur > 0) setWave(v, Math.min(1, player.currentTime / dur));
-  v.querySelector('.v-time').textContent = fmtDur(player.currentTime);
+  if (dur > 0) setWave(v, Math.min(1, curTime() / dur));
+  v.querySelector('.v-time').textContent = fmtDur(curTime());
 }
 
 function resetVoiceUI(i) {
@@ -399,6 +409,7 @@ function playingDuration() {
 
 async function playVoice(i, seekFrac) {
   const m = S.chat.messages[i];
+  if (ear) await fromEar(false);
   if (playingIdx !== i) {
     if (playingIdx != null) resetVoiceUI(playingIdx);
     playingIdx = i;
@@ -410,8 +421,124 @@ async function playVoice(i, seekFrac) {
     const go = () => { const d = playingDuration(); if (d) player.currentTime = seekFrac * d; };
     if (player.readyState >= 1) go(); else player.addEventListener('loadedmetadata', go, { once: true });
   }
-  player.play().catch(err => { if (err.name !== 'AbortError') toast('Could not play this voice note: ' + err.message); });
+  player.play().then(() => { if (atEar) toEar(); })
+    .catch(err => { if (err.name !== 'AbortError') toast('Could not play this voice note: ' + err.message); });
   tickVoice();
+}
+
+function pauseVoice() { if (ear) fromEar(false); else player.pause(); }
+
+function seekBy(sec) {
+  if (playingIdx == null || ear) return;
+  const d = playingDuration();
+  player.currentTime = Math.max(0, Math.min(d || Infinity, player.currentTime + sec));
+  updateVoiceUI();
+}
+
+// the voice note before or after this one in the chat
+function voiceNear(from, dir) {
+  const msgs = S.chat?.messages || [];
+  for (let k = from + dir; k >= 0 && k < msgs.length; k += dir) {
+    const a = msgs[k].a;
+    if (a && a.k === 'audio' && !a.missing) return k;
+  }
+  return null;
+}
+function playVoiceAt(k) {
+  if (k == null) return;
+  if (!voiceNode(k)) jumpTo(k, false);
+  voiceNode(k)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  playVoice(k);
+}
+
+// ---------- system media controls: notification, lock screen, headset and keyboard keys ----------
+const MS = 'mediaSession' in navigator ? navigator.mediaSession : null;
+let sessionIdx = null;
+function updateSession() {
+  if (!MS) return;
+  if (playingIdx == null) {
+    if (sessionIdx != null) { MS.metadata = null; MS.playbackState = 'none'; sessionIdx = null; }
+    return;
+  }
+  if (sessionIdx !== playingIdx && S.chat) {
+    sessionIdx = playingIdx;
+    const m = S.chat.messages[playingIdx];
+    MS.metadata = new MediaMetadata({
+      title: `Voice note from ${S.chat.participants[m.s]?.name || 'someone'}`,
+      artist: fmtDate(m.t),
+      album: S.chat.title,
+      artwork: S.chat.avatarUrl ? [{ src: S.chat.avatarUrl }] : [],
+    });
+  }
+  MS.playbackState = isPaused() ? 'paused' : 'playing';
+  const d = playingDuration();
+  if (d > 0) { try { MS.setPositionState({ duration: d, position: Math.min(d, curTime()), playbackRate: speed }); } catch { /* not supported */ } }
+}
+if (MS) {
+  const on = (action, fn) => { try { MS.setActionHandler(action, fn); } catch { /* action not supported here */ } };
+  on('play', () => { if (playingIdx != null) playVoice(playingIdx); });
+  on('pause', pauseVoice);
+  on('stop', stopAudio);
+  on('seekbackward', e => seekBy(-(e.seekOffset || 5)));
+  on('seekforward', e => seekBy(e.seekOffset || 5));
+  on('seekto', e => { if (playingIdx != null && !ear) { player.currentTime = e.seekTime; updateVoiceUI(); } });
+  on('previoustrack', () => { if (playingIdx != null) playVoiceAt(voiceNear(playingIdx, -1)); });
+  on('nexttrack', () => { if (playingIdx != null) playVoiceAt(voiceNear(playingIdx, 1)); });
+}
+
+// ---------- at the ear ----------
+let atEar = false, earCached = null;
+async function earFile(m) {
+  if (earCached && earCached.f === m.a.f) return earCached.uri;
+  const bytes = await api.readMedia(S.chatId, m.a.f);
+  const path = 'ear-voice.' + (m.a.f.split('.').pop() || 'ogg');
+  let bin = '';
+  for (let k = 0; k < bytes.length; k += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(k, k + 0x8000));
+  await FS.writeFile({ path, data: btoa(bin), directory: 'CACHE' });
+  const { uri } = await FS.getUri({ path, directory: 'CACHE' });
+  earCached = { f: m.a.f, uri };
+  return uri;
+}
+
+async function toEar() {
+  if (!Ear || !FS || ear || playingIdx == null || player.paused) return;
+  const i = playingIdx, m = S.chat.messages[i];
+  ear = { i, pos: player.currentTime, timer: 0 };
+  player.pause();
+  try {
+    const path = await earFile(m);
+    if (!ear || ear.i !== i) return;
+    await Ear.play({ path, position: ear.pos, rate: speed });
+    ear.timer = setInterval(async () => {
+      const r = await Ear.position().catch(() => null);
+      if (ear && r && r.position >= 0) { ear.pos = r.position; updateVoiceUI(); }
+    }, 200);
+  } catch {
+    if (ear && ear.i === i) { ear = null; player.play().catch(() => {}); }
+  }
+}
+
+async function fromEar(resume = true) {
+  if (!ear) return;
+  const e = ear;
+  ear = null;
+  clearInterval(e.timer);
+  const r = await Ear.halt().catch(() => ({ position: -1 }));
+  if (playingIdx !== e.i) return;
+  player.currentTime = r.position >= 0 ? r.position : e.pos;
+  if (resume) player.play().catch(() => {}); else { updateVoiceUI(); Ear.stop(); }
+}
+
+if (Ear) {
+  Ear.addListener('proximity', ({ near }) => { atEar = near; if (near) toEar(); else fromEar(); });
+  Ear.addListener('ended', () => {
+    if (!ear) return;
+    clearInterval(ear.timer);
+    ear = null;
+    voiceEnded();
+  });
+  player.addEventListener('play', () => Ear.start().catch(() => {}));
+  player.addEventListener('pause', () => { if (!ear) Ear.stop().catch(() => {}); });
 }
 
 // move the dot and bars every frame while playing, so it glides like WhatsApp instead of jumping
@@ -421,31 +548,36 @@ function tickVoice() {
   const step = () => {
     if (playingIdx == null || player.paused) return;
     const v = voiceNode(playingIdx), d = playingDuration();
-    if (v && d) setWave(v, Math.min(1, player.currentTime / d));
+    if (v && d && !(scrub && scrub.i === playingIdx)) setWave(v, Math.min(1, player.currentTime / d));
     voiceFrame = requestAnimationFrame(step);
   };
   voiceFrame = requestAnimationFrame(step);
 }
 player.addEventListener('play', tickVoice);
 
-function stopAudio() { player.pause(); if (playingIdx != null) resetVoiceUI(playingIdx); playingIdx = null; }
+function stopAudio() {
+  if (ear) { clearInterval(ear.timer); ear = null; Ear.halt().catch(() => {}); }
+  player.pause();
+  if (playingIdx != null) resetVoiceUI(playingIdx);
+  playingIdx = null;
+  updateSession();
+  if (Ear) Ear.stop().catch(() => {});
+}
 
 player.addEventListener('timeupdate', updateVoiceUI);
 player.addEventListener('play', updateVoiceUI);
 player.addEventListener('pause', updateVoiceUI);
 player.addEventListener('loadedmetadata', () => { if (playingIdx != null && isFinite(player.duration) && player.duration > 0) durations.set(playingIdx, player.duration); updateVoiceUI(); });
-player.addEventListener('ended', () => {
+function voiceEnded() {
   const done = playingIdx;
   resetVoiceUI(done);
   playingIdx = null;
   // like WhatsApp: roll straight into the next voice note if it comes right after
   const next = S.chat?.messages[done + 1];
-  if (next && next.a && next.a.k === 'audio' && !next.a.missing) {
-    if (!voiceNode(done + 1)) jumpTo(done + 1, false);
-    voiceNode(done + 1)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    playVoice(done + 1);
-  }
-});
+  if (next && next.a && next.a.k === 'audio' && !next.a.missing) playVoiceAt(done + 1);
+  else { updateSession(); if (Ear) Ear.stop().catch(() => {}); }
+}
+player.addEventListener('ended', () => { if (!ear) voiceEnded(); });
 
 // ---------- real waveforms: decode each voice note once, remember its loudness shape ----------
 const waveCache = new Map();
@@ -523,15 +655,12 @@ $('#messages').addEventListener('click', e => {
   const voice = t.closest('[data-voice]');
   if (voice) {
     const i = +voice.dataset.voice;
-    if (t.closest('.play')) { if (playingIdx === i && !player.paused) player.pause(); else playVoice(i); }
-    else if (t.closest('.wave')) {
-      const r = t.closest('.wave').getBoundingClientRect();
-      playVoice(i, Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
-    }
+    if (t.closest('.play')) { if (playingIdx === i && !isPaused()) pauseVoice(); else playVoice(i); }
     else if (t.closest('.speed')) {
       speed = speed === 1 ? 1.5 : speed === 1.5 ? 2 : 1;
       store.set('speed', speed); player.playbackRate = speed;
       document.querySelectorAll('.voice .speed').forEach(s => (s.textContent = speed + '×'));
+      updateSession();
     }
     return;
   }
@@ -542,6 +671,36 @@ $('#messages').addEventListener('click', e => {
   if (a) { api.openLink(a.dataset.href); }
 });
 $('#messages').addEventListener('scroll', onScrollEvent, { passive: true });
+
+// drag along a voice note's waveform to scrub; a tap seeks there too
+function scrubAt(e) {
+  const r = scrub.w.getBoundingClientRect();
+  scrub.frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+  setWave(scrub.v, scrub.frac);
+  const d = scrub.i === playingIdx ? playingDuration() : durations.get(scrub.i) || 0;
+  if (d) scrub.v.querySelector('.v-time').textContent = fmtDur(scrub.frac * d);
+}
+$('#messages').addEventListener('pointerdown', e => {
+  const w = e.target.closest('.voice .wave');
+  if (!w || e.button > 0) return;
+  const v = w.closest('[data-voice]');
+  scrub = { i: +v.dataset.voice, w, v, id: e.pointerId, frac: 0 };
+  w.setPointerCapture(e.pointerId);
+  scrubAt(e);
+});
+$('#messages').addEventListener('pointermove', e => { if (scrub && e.pointerId === scrub.id) scrubAt(e); });
+$('#messages').addEventListener('pointerup', e => {
+  if (!scrub || e.pointerId !== scrub.id) return;
+  const { i, frac } = scrub;
+  scrub = null;
+  playVoice(i, frac);
+});
+$('#messages').addEventListener('pointercancel', () => {
+  if (!scrub) return;
+  const i = scrub.i;
+  scrub = null;
+  if (i === playingIdx) updateVoiceUI(); else resetVoiceUI(i);
+});
 $('#lightbox').onclick = e => { if (!e.target.closest('#lightbox-img, #lightbox-video, .lb-bar, .lb-nav, .lb-strip')) closeViewer(); };
 // ---------- contact info + photo viewer (like WhatsApp) ----------
 function otherIndex() { return S.chat.participants.findIndex((_, k) => k !== S.chat.me); }

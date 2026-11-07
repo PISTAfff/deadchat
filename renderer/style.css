@@ -132,7 +132,7 @@ mark { background: var(--mark); color: inherit; border-radius: 2px; }
 .voice .play:hover { color: #e9edef; }
 .voice .play svg { fill: currentColor; stroke: none; width: 30px; height: 30px; }
 .v-main { flex: 1; min-width: 0; padding-top: 14px; }
-.wave { position: relative; height: 26px; display: flex; align-items: center; gap: 2px; cursor: pointer; }
+.wave { position: relative; height: 26px; display: flex; align-items: center; gap: 2px; cursor: pointer; touch-action: pan-y; user-select: none; }
 .wave i { flex: 1; min-width: 2px; max-width: 3px; border-radius: 2px; background: #ffffff4d; }
 .out .wave i { background: #ffffff59; }
 .wave i.on { background: #53bdeb; }

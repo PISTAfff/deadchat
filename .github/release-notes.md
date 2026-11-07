@@ -1,12 +1,7 @@
-**What's new in 1.1**
+**What's new in 1.2**
 
-- Send photos, videos, files, recorded voice notes and stickers. They stay on your device with a single grey tick, never delivered.
-- Sticker picker with every sticker from all your imported chats.
-- Voice notes laid out like WhatsApp, with their real waveform and smooth playback.
-- A WhatsApp-style recording screen: live waveform, pause and resume, discard and send.
-- Photo and video viewer: move between all media, swipe on phones, jump to the message.
-- Editable contact info: photo, name and an About note.
-- A WhatsApp-style message box with emoji, smoother scrolling, and transitions throughout.
+- Voice notes: drag along the waveform to scrub, and control playback from the notification, lock screen, headset or media keys (play, pause, skip back and forward, previous and next note).
+- Android: hold the phone to your ear and the voice note moves to the earpiece with the screen off, like WhatsApp. Move it away and it carries on through the speaker.
 
 **Download for your system**
 

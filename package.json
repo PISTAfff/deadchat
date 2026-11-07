@@ -1,7 +1,7 @@
 {
   "name": "deadchat",
   "productName": "DeadChat",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A private, offline, read-only home for old WhatsApp chats. Import an export, scroll back, play the voice notes, write what you never sent.",
   "main": "main.js",
   "license": "MIT",
