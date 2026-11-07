@@ -46,13 +46,19 @@ public class EarpiecePlugin extends Plugin implements SensorEventListener {
         }
     }
 
+    // Nothing here may take the app down: a phone without the sensor, a lock it won't give,
+    // and the note just keeps playing through the speaker.
     @PluginMethod
     public void start(PluginCall call) {
-        if (proximity != null && !listening) {
-            sensors.registerListener(this, proximity, SensorManager.SENSOR_DELAY_NORMAL);
-            listening = true;
-        }
-        if (screenOff != null && !screenOff.isHeld()) screenOff.acquire(60 * 60 * 1000L);
+        try {
+            if (proximity != null && !listening) {
+                sensors.registerListener(this, proximity, SensorManager.SENSOR_DELAY_NORMAL);
+                listening = true;
+            }
+        } catch (Exception ignored) {}
+        try {
+            if (screenOff != null && !screenOff.isHeld()) screenOff.acquire(60 * 60 * 1000L);
+        } catch (Exception ignored) {}
         JSObject r = new JSObject();
         r.put("available", proximity != null);
         call.resolve(r);
@@ -60,7 +66,7 @@ public class EarpiecePlugin extends Plugin implements SensorEventListener {
 
     @PluginMethod
     public void stop(PluginCall call) {
-        stopListening();
+        try { stopListening(); } catch (Exception ignored) {}
         call.resolve();
     }
 
@@ -102,15 +108,21 @@ public class EarpiecePlugin extends Plugin implements SensorEventListener {
     @PluginMethod
     public void position(PluginCall call) {
         JSObject r = new JSObject();
-        r.put("position", player != null ? player.getCurrentPosition() / 1000.0 : -1);
-        r.put("playing", player != null && player.isPlaying());
+        try {
+            r.put("position", player != null ? player.getCurrentPosition() / 1000.0 : -1);
+            r.put("playing", player != null && player.isPlaying());
+        } catch (Exception e) {
+            r.put("position", -1);
+            r.put("playing", false);
+        }
         call.resolve(r);
     }
 
     // stop playing at the ear and say where it got to, so the page carries on from there
     @PluginMethod
     public void halt(PluginCall call) {
-        double pos = player != null ? player.getCurrentPosition() / 1000.0 : -1;
+        double pos = -1;
+        try { pos = player != null ? player.getCurrentPosition() / 1000.0 : -1; } catch (Exception ignored) {}
         release();
         JSObject r = new JSObject();
         r.put("position", pos);
@@ -147,11 +159,15 @@ public class EarpiecePlugin extends Plugin implements SensorEventListener {
         if (listening) sensors.unregisterListener(this);
         listening = false;
         near = false;
-        if (screenOff != null && screenOff.isHeld()) screenOff.release();
+        try { if (screenOff != null && screenOff.isHeld()) screenOff.release(); } catch (Exception ignored) {}
     }
 
     private void toEarpiece(boolean on) {
         if (audio == null) return;
+        try { route(on); } catch (Exception ignored) {}
+    }
+
+    private void route(boolean on) {
         if (on) {
             audio.setMode(AudioManager.MODE_IN_COMMUNICATION);
             if (Build.VERSION.SDK_INT >= 31) {

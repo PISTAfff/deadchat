@@ -1,4 +1,8 @@
-**What's new in 1.2**
+**What's new in 1.2.1**
+
+- Android: playing a voice note no longer closes the app.
+
+**New in 1.2**
 
 - Voice notes: drag along the waveform to scrub, and control playback from the notification, lock screen, headset or media keys (play, pause, skip back and forward, previous and next note).
 - Android: hold the phone to your ear and the voice note moves to the earpiece with the screen off, like WhatsApp. Move it away and it carries on through the speaker.
